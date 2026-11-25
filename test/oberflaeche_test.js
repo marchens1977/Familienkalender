@@ -63,6 +63,52 @@ async function warteAufServer() {
     assert.match(await a.textContent("#tag-liste"), /19:00–20:30 Uhr · Schule · Alex/);
     assert.strictEqual(await a.locator("#raster .tag.heute .mini").count(), 1);
 
+    // 2b. Wochenansicht: 7 Tage untereinander, Termin am heutigen Tag
+    const heuteIso = await a.getAttribute("#raster .tag.heute", "data-tag");
+    await a.click(".ansichten button[data-ansicht=woche]");
+    await a.waitForSelector("#bereich-woche:not(.versteckt)");
+    assert.strictEqual(await a.locator("#bereich-woche .woche-tag").count(), 7);
+    assert.match(await a.textContent("#bereich-woche .woche-tag.heute"), /Elternabend.*19:00–20:30/);
+    assert.match(await a.textContent("#bereich-woche .woche-tag >> nth=0"), /^Mo, /);
+    if (fotos) await a.screenshot({ path: path.join(fotos, "7-woche.png") });
+    const ersterTag = await a.getAttribute("#bereich-woche .woche-tag >> nth=0", "data-tag");
+    await a.click("#monat-vor");
+    const naechsterMontag = await a.getAttribute("#bereich-woche .woche-tag >> nth=0", "data-tag");
+    assert.strictEqual((new Date(naechsterMontag) - new Date(ersterTag)) / 864e5, 7);
+    await a.click("#heute");
+
+    // 2c. Tagesansicht: Stundenplan, Termin als Block um 19 Uhr
+    await a.click("#bereich-woche .woche-tag.heute h3");
+    await a.waitForSelector("#bereich-tag:not(.versteckt)");
+    assert.ok(await a.locator(".ansichten button[data-ansicht=tag].aktiv").count() === 1);
+    const block = a.locator("#stunden .block", { hasText: "Elternabend" });
+    assert.strictEqual(await block.count(), 1);
+    const oben = await block.evaluate((b) => parseFloat(b.style.top));
+    assert.ok(Math.abs(oben - 19 * 56) < 3, "Block steht nicht bei 19 Uhr: " + oben);
+    const hoehe = await block.evaluate((b) => parseFloat(b.style.height));
+    assert.ok(Math.abs(hoehe - 1.5 * 56) < 4, "Block ist nicht 1,5 Stunden hoch: " + hoehe);
+    if (fotos) await a.screenshot({ path: path.join(fotos, "8-tag.png") });
+    // Tippen auf 10 Uhr -> neuer Termin mit 10:00–11:00
+    await a.click("#stunden .stunde[data-stunde='10'] span");
+    assert.strictEqual(await a.inputValue("#form-termin [name=start_time]"), "10:00");
+    assert.strictEqual(await a.inputValue("#form-termin [name=end_time]"), "11:00");
+    assert.strictEqual(await a.isChecked("#form-termin [name=all_day]"), false);
+    assert.strictEqual(await a.inputValue("#form-termin [name=start_date]"), heuteIso);
+    await a.click("#termin-abbrechen");
+    // ein Tag weiter: kein Elternabend
+    await a.click("#monat-vor");
+    assert.strictEqual(await a.locator("#stunden .block").count(), 0);
+    // Ansicht wird gemerkt (nach Neuladen weiter Tagesansicht)
+    await a.reload();
+    await a.waitForSelector("#bereich-tag:not(.versteckt)");
+    // zurück zur Monatsansicht, nochmal auf ausgewählten Tag tippen = Tagesansicht
+    await a.click(".ansichten button[data-ansicht=monat]");
+    await a.click("#heute");
+    await a.click("#raster .tag.heute");
+    await a.waitForSelector("#bereich-tag:not(.versteckt)");
+    await a.click(".ansichten button[data-ansicht=monat]");
+    await a.waitForSelector("#bereich-monat:not(.versteckt)");
+
     // 3. Geburtstag mit jährlicher Wiederholung -> erscheint im nächsten Jahr gleichen Monats
     await a.click("#neu");
     await a.fill("#form-termin [name=title]", "Test-Geburtstag");

@@ -11,7 +11,10 @@ const zustand = {
   ich: null, mitglieder: [], termine: [],
   jahr: 0, monat: 0, // monat 0-11
   gewaehlt: "", bearbeitet: null,
+  ansicht: localStorage.getItem("fk_ansicht") || "monat", // monat | woche | tag
+  scrollTag: "",
 };
+const STUNDE_PX = 56;
 
 // ------------------------------------------------------------ Server-Anfragen
 async function api(methode, pfad, daten) {
@@ -109,6 +112,136 @@ function zeige(id) {
 }
 
 function zeichneKalender() {
+  const a = zustand.ansicht;
+  $(".ansichten").style.top = $(".kopf").offsetHeight + "px"; // Umschalter klebt unter der Kopfzeile
+  for (const n of ["monat", "woche", "tag"]) $("#bereich-" + n).classList.toggle("versteckt", n !== a);
+  document.querySelectorAll(".ansichten button").forEach((b) => b.classList.toggle("aktiv", b.dataset.ansicht === a));
+  const d = s2d(zustand.gewaehlt);
+  zustand.jahr = d.getUTCFullYear();
+  zustand.monat = d.getUTCMonth();
+  if (a === "woche") zeichneWoche();
+  else if (a === "tag") zeichneTag();
+  else zeichneMonat();
+}
+
+function zeigeAnsicht(a) {
+  zustand.ansicht = a;
+  localStorage.setItem("fk_ansicht", a);
+  zustand.scrollTag = "";
+  window.scrollTo(0, 0);
+  zeichneKalender();
+}
+
+function montag(tag) { return plusTage(tag, -((s2d(tag).getUTCDay() + 6) % 7)); }
+function kurzDatum(tag) { const d = s2d(tag); return d.getUTCDate() + ". " + MONATE_KURZ[d.getUTCMonth()]; }
+
+// ---- Wochenansicht: Liste Mo–So
+function zeichneWoche() {
+  const von = montag(zustand.gewaehlt), bis = plusTage(von, 6);
+  const dv = s2d(von), db = s2d(bis);
+  $("#monat-titel").textContent = dv.getUTCDate() + "." + (dv.getUTCMonth() === db.getUTCMonth() ? "" : (dv.getUTCMonth() + 1) + ".") +
+    "–" + db.getUTCDate() + "." + (db.getUTCMonth() + 1) + ".";
+  const karte = vorkommenNachTag(von, bis);
+  const h = heute();
+  const bereich = $("#bereich-woche");
+  bereich.replaceChildren();
+  for (let i = 0; i < 7; i++) {
+    const tag = plusTage(von, i);
+    const box = document.createElement("div");
+    box.className = "woche-tag";
+    box.dataset.tag = tag;
+    if (tag === h) box.classList.add("heute");
+    const t = document.createElement("h3");
+    t.textContent = schoen(tag);
+    if (tag === h) { const m = document.createElement("span"); m.className = "marke"; m.textContent = "heute"; t.append(m); }
+    t.addEventListener("click", () => { zustand.gewaehlt = tag; zeigeAnsicht("tag"); });
+    const ul = document.createElement("ul");
+    ul.className = "liste";
+    fuelleListe(ul, karte[tag] || [], false, "keine Termine");
+    box.append(t, ul);
+    bereich.append(box);
+  }
+}
+
+// ---- Tagesansicht: Stundenplan
+function minuten(z) { const [h, m] = z.split(":").map(Number); return h * 60 + m; }
+function zeichneTag() {
+  const tag = zustand.gewaehlt;
+  const d = s2d(tag);
+  $("#monat-titel").textContent = TAGE[d.getUTCDay()] + ", " + kurzDatum(tag);
+  const alle = vorkommenNachTag(tag, tag)[tag] || [];
+  // ganztägig oder mittlerer Tag eines mehrtägigen Termins -> oben als Liste
+  const ganz = alle.filter((v) => v.e.all_day || (v.s !== tag && v.en !== tag));
+  const zeit = alle.filter((v) => !ganz.includes(v)).map((v) => {
+    const start = v.s === tag ? minuten(v.e.start_time) : 0;
+    let ende = v.en === tag ? minuten(v.e.end_time || v.e.start_time) : 24 * 60;
+    if (ende <= start) ende = Math.min(start + 30, 24 * 60);
+    return { v, start, ende };
+  }).sort((a, b) => a.start - b.start || b.ende - a.ende);
+  const ul = $("#tag-ganztags");
+  ul.replaceChildren();
+  if (ganz.length) fuelleListe(ul, ganz, false, "");
+  // Überschneidungen nebeneinander: Gruppen bilden, in Spuren verteilen
+  let gruppe = [], gruppenEnde = -1;
+  const fertig = () => { const n = Math.max(...gruppe.map((x) => x.spur)) + 1; gruppe.forEach((x) => { x.n = n; }); gruppe = []; };
+  for (const x of zeit) {
+    if (gruppe.length && x.start >= gruppenEnde) fertig();
+    const spuren = [];
+    gruppe.forEach((y) => { if (y.ende > x.start) spuren[y.spur] = true; });
+    x.spur = 0;
+    while (spuren[x.spur]) x.spur++;
+    gruppe.push(x);
+    gruppenEnde = Math.max(gruppenEnde, x.ende);
+  }
+  if (gruppe.length) fertig();
+
+  const plan = $("#stunden");
+  plan.replaceChildren();
+  for (let h = 0; h < 24; h++) {
+    const zeile = document.createElement("div");
+    zeile.className = "stunde";
+    zeile.dataset.stunde = h;
+    const l = document.createElement("span");
+    l.textContent = String(h).padStart(2, "0") + ":00";
+    zeile.append(l);
+    zeile.addEventListener("click", () => oeffneTermin(null, String(h).padStart(2, "0") + ":00"));
+    plan.append(zeile);
+  }
+  for (const x of zeit) {
+    const b = document.createElement("div");
+    b.className = "block";
+    b.style.top = (x.start / 60 * STUNDE_PX + 1) + "px";
+    b.style.height = Math.max((x.ende - x.start) / 60 * STUNDE_PX - 2, 24) + "px";
+    b.style.left = "calc(3.6em + (100% - 3.8em) * " + x.spur + " / " + x.n + ")";
+    b.style.width = "calc((100% - 3.8em) / " + x.n + " - 3px)";
+    b.style.borderLeftColor = farbe(x.v.e);
+    const t = document.createElement("b");
+    t.textContent = x.v.e.title;
+    const u = document.createElement("small");
+    u.textContent = zeitText(x.v) + (x.v.e.location ? " · " + x.v.e.location : "");
+    b.append(t, u);
+    b.addEventListener("click", (ev) => { ev.stopPropagation(); oeffneTermin(x.v.e); });
+    plan.append(b);
+  }
+  const jetztD = new Date();
+  if (tag === heute()) {
+    const linie = document.createElement("div");
+    linie.className = "jetzt";
+    linie.style.top = ((jetztD.getHours() * 60 + jetztD.getMinutes()) / 60 * STUNDE_PX) + "px";
+    plan.append(linie);
+  }
+  // beim Wechsel des Tages zu einer sinnvollen Uhrzeit springen (heute: jetzt, sonst 7 Uhr / erster Termin)
+  if (zustand.scrollTag !== tag) {
+    zustand.scrollTag = tag;
+    let ziel = tag === heute() ? Math.max(jetztD.getHours() - 1, 0) : 7;
+    if (tag !== heute() && zeit.length) ziel = Math.min(ziel, Math.floor(zeit[0].start / 60));
+    const kopf = $(".kopf").offsetHeight + $(".ansichten").offsetHeight;
+    window.scrollTo(0, Math.max(0, plan.getBoundingClientRect().top + window.scrollY - kopf + ziel * STUNDE_PX - 8));
+  }
+}
+
+// ---- Monatsansicht
+function zeichneMonat() {
   const erster = new Date(Date.UTC(zustand.jahr, zustand.monat, 1));
   const versatz = (erster.getUTCDay() + 6) % 7;
   const von = plusTage(d2s(erster), -versatz);
@@ -145,7 +278,11 @@ function zeichneKalender() {
       m.textContent = "+" + (eintraege.length - 3) + " weitere";
       zelle.append(m);
     }
-    zelle.addEventListener("click", () => { zustand.gewaehlt = tag; zeichneKalender(); });
+    // 1x tippen = Tag auswählen, auf den ausgewählten Tag nochmal tippen = Tagesansicht
+    zelle.addEventListener("click", () => {
+      if (zustand.gewaehlt === tag) { zeigeAnsicht("tag"); return; }
+      zustand.gewaehlt = tag; zeichneKalender();
+    });
     raster.append(zelle);
   }
   // Liste für den gewählten Tag
@@ -286,28 +423,31 @@ $("#form-registrieren").addEventListener("submit", async (ev) => {
   } catch (e) { $("#login-fehler").textContent = e.message; }
 });
 
-// ------------------------------------------------------------ Monat wechseln
+// ------------------------------------------------------------ Blättern / Ansicht wechseln
 function monatPlus(n) {
-  let m = zustand.monat + n, j = zustand.jahr;
-  while (m < 0) { m += 12; j--; }
-  while (m > 11) { m -= 12; j++; }
-  zustand.monat = m; zustand.jahr = j;
-  zustand.gewaehlt = d2s(new Date(Date.UTC(j, m, 1)));
+  const d = s2d(zustand.gewaehlt);
+  zustand.gewaehlt = d2s(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1)));
   zeichneKalender();
 }
-$("#monat-zurueck").addEventListener("click", () => monatPlus(-1));
-$("#monat-vor").addEventListener("click", () => monatPlus(1));
-$("#heute").addEventListener("click", () => {
-  const j = new Date(); zustand.jahr = j.getFullYear(); zustand.monat = j.getMonth(); zustand.gewaehlt = heute(); zeichneKalender();
-});
-// Wischen nach links/rechts wechselt den Monat
-let wischX = null;
-$("#raster").addEventListener("touchstart", (ev) => { wischX = ev.touches[0].clientX; }, { passive: true });
-$("#raster").addEventListener("touchend", (ev) => {
-  if (wischX === null) return;
-  const dx = ev.changedTouches[0].clientX - wischX;
-  wischX = null;
-  if (Math.abs(dx) > 60) monatPlus(dx < 0 ? 1 : -1);
+function blaettern(n) {
+  if (zustand.ansicht === "woche") zustand.gewaehlt = plusTage(zustand.gewaehlt, 7 * n);
+  else if (zustand.ansicht === "tag") zustand.gewaehlt = plusTage(zustand.gewaehlt, n);
+  else return monatPlus(n);
+  zeichneKalender();
+}
+$("#monat-zurueck").addEventListener("click", () => blaettern(-1));
+$("#monat-vor").addEventListener("click", () => blaettern(1));
+$("#heute").addEventListener("click", () => { zustand.gewaehlt = heute(); zustand.scrollTag = ""; zeichneKalender(); });
+document.querySelectorAll(".ansichten button").forEach((b) => b.addEventListener("click", () => zeigeAnsicht(b.dataset.ansicht)));
+$("#zur-tagesansicht").addEventListener("click", () => zeigeAnsicht("tag"));
+// Wischen nach links/rechts blättert (nur wenn eindeutig waagerecht)
+let wisch = null;
+$("#inhalt").addEventListener("touchstart", (ev) => { wisch = { x: ev.touches[0].clientX, y: ev.touches[0].clientY }; }, { passive: true });
+$("#inhalt").addEventListener("touchend", (ev) => {
+  if (!wisch) return;
+  const dx = ev.changedTouches[0].clientX - wisch.x, dy = ev.changedTouches[0].clientY - wisch.y;
+  wisch = null;
+  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) blaettern(dx < 0 ? 1 : -1);
 });
 
 // ------------------------------------------------------------ Termin-Formular
@@ -330,7 +470,7 @@ formT.start_date.addEventListener("change", () => {
   formT.start_date.dataset.alt = neu;
 });
 
-function oeffneTermin(e) {
+function oeffneTermin(e, uhrzeit) {
   zustand.bearbeitet = e || null;
   formT.reset();
   $("#termin-fehler").textContent = "";
@@ -339,6 +479,11 @@ function oeffneTermin(e) {
   const t = e || { title: "", start_date: zustand.gewaehlt, end_date: zustand.gewaehlt, all_day: true,
     start_time: "", end_time: "", repeat: "none", repeat_until: "", location: "", notes: "",
     participants: [zustand.ich.id] };
+  if (!e && uhrzeit) {
+    t.all_day = false;
+    t.start_time = uhrzeit;
+    t.end_time = String(Math.min(Number(uhrzeit.slice(0, 2)) + 1, 23)).padStart(2, "0") + uhrzeit.slice(2);
+  }
   formT.title.value = t.title;
   formT.start_date.value = t.start_date;
   formT.start_date.dataset.alt = t.start_date;
@@ -374,6 +519,7 @@ function oeffneTermin(e) {
 }
 
 $("#neu").addEventListener("click", () => oeffneTermin(null));
+// (Tagesansicht: Tippen auf eine Stunde legt dort einen Termin an)
 $("#termin-abbrechen").addEventListener("click", () => $("#dlg-termin").close());
 
 formT.addEventListener("submit", async (ev) => {

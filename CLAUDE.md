@@ -38,7 +38,12 @@ Läuft auf dem Pi (installiert 2026-11-25). Neue Funktionen werden automatisch g
   Benutzername, Startpasswort und Anleitung → Knopf „Per WhatsApp senden“ (wa.me) oder „Kopieren“.
 - Beim ersten Anmelden mit Startpasswort **muss** ein eigenes Passwort gewählt werden (Dialog nicht wegdrückbar)
 - Profil: Anzeigename, eigene Farbe, Passwort ändern
-- Monatsansicht (wischen oder Pfeile), Tagesliste, „Demnächst“ (30 Tage)
+- **Drei Ansichten** (Umschalter unter der Kopfzeile, die gewählte Ansicht wird gemerkt):
+  - **Monat:** Raster, Tagesliste, „Demnächst“ (30 Tage). Ausgewählten Tag nochmal antippen oder „Tagesansicht ›“ = Tagesansicht
+  - **Woche:** Liste Mo–So untereinander (Entscheidung Nutzer 2026-11-25, statt Stundenplan mit 7 Spalten); Tag antippen = Tagesansicht
+  - **Tag:** Stundenplan 0–24 Uhr, ganztägige Termine oben, Termine als Blöcke (Überschneidungen nebeneinander),
+    orange Linie = jetzt, springt zur passenden Uhrzeit. Auf eine Stunde tippen = neuer Termin zu dieser Uhrzeit
+  - Pfeile und Wischen blättern je nach Ansicht Monat / Woche / Tag weiter
 - Termine: ganztägig oder mit Uhrzeit, mehrtägig, Ort, Notiz, „Wer ist dabei?“, Wiederholung
   (wöchentlich, monatlich, jährlich, optional „bis“)
 - Alle 60 Sekunden und beim Zurückkehren in die App werden Änderungen der anderen geladen
@@ -99,14 +104,15 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
   kaputtes Update → zurück zur alten Version).
 - `test/oberflaeche_test.js` (Playwright/Chromium im Handy-Format): kompletter Ablauf mit drei Personen
   (registrieren, Termin anlegen, Geburtstag jährlich, Freigabe, zweite Person bearbeitet, Export,
-  Verwalter legt Mitglied an + WhatsApp-Text, Anmeldung mit Startpasswort + eigenes Passwort, Löschen).
+  Verwalter legt Mitglied an + WhatsApp-Text, Anmeldung mit Startpasswort + eigenes Passwort, Löschen,
+  Wochenansicht (7 Tage, Blättern), Tagesansicht (Block-Position/-Höhe, Tippen auf Stunde, Ansicht gemerkt)).
 - Pi-Skripte: nur Tippfehler-Prüfung (`bash -n`), echter Test auf dem Pi durch den Nutzer.
 
 ## 7. Offene Punkte / Ideen
 
 - Einzelnen Termin aus einer Serie löschen/verschieben (geht noch nicht)
 - Erinnerungen/Benachrichtigungen aufs Handy (bräuchte https bzw. eigene Lösung)
-- Wochen- oder Listenansicht, Suche
+- Suche
 - Einladungs-Link mit Einmal-Code (noch weniger Tipparbeit als Benutzername + Startpasswort)
 - Eventuell https, falls gewünscht
 
@@ -117,6 +123,7 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - [ ] Verwalter: ☰ → „Familienmitglied anlegen“ → Zugangsdaten erscheinen → „Per WhatsApp senden“ öffnet WhatsApp mit dem Text
 - [ ] Familienmitglied: Anmeldung mit Startpasswort → muss eigenes Passwort wählen → sieht den Kalender
 - [ ] Familienmitglied außerhalb: WireGuard-Datei importiert, VPN an → Link öffnet den Kalender
+- [ ] Woche/Tag: Umschalter „Monat | Woche | Tag“ ist da; Wischen und Pfeile blättern; in der Tagesansicht auf eine Stunde tippen legt einen Termin an
 - [ ] Auto-Update: nach der nächsten Änderung durch Claude ist sie spätestens nach ~1 Stunde da, ohne dass du etwas tust
 - [ ] Handy (zu Hause, VPN aus): die Adresse, die das Installationsskript am Ende anzeigt, öffnet die Anmeldeseite
 - [ ] Design: Kopfzeile Blau mit oranger Linie, „+“-Knopf und heutiger Tag Orange
@@ -140,3 +147,4 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 | 2026-11-25 | Auf dem Pi installiert, „FERTIG ✅“ (Nutzer-Foto) |
 | 2026-11-25 | Verwalter legt Mitglieder mit Startpasswort an, WhatsApp-Text, Pflicht-Passwortwechsel; stündliches Auto-Update mit Rückfall; Handy lädt neue Version selbst. 19 Server-/Skript-Tests + Browser-Test grün |
 | 2026-11-25 | Update auf dem Pi eingespielt (4b6fc19), Auto-Update-Zeitplan aktiv ✅ (Nutzer-Foto) |
+| 2026-11-25 | Wochenansicht (Liste Mo–So) und Tagesansicht (Stundenplan) ergänzt, Ansicht wird gemerkt. Alle Tests grün |

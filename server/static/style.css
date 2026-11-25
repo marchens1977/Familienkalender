@@ -113,3 +113,35 @@ dialog { border-top: 6px solid var(--orange); }
   padding: .6em; margin: .4em 0; border: 1px solid var(--rand); }
 .knopf.whatsapp { background: #25D366; border-color: #25D366; color: #fff; font-weight: 600; }
 #form-erstpasswort .haupt { width: 100%; }
+
+/* Umschaltung Monat / Woche / Tag */
+.ansichten { display: flex; gap: 0; background: #fff; border-bottom: 1px solid var(--rand);
+  position: sticky; top: 0; z-index: 2; }
+.ansichten button { flex: 1; border: 0; border-radius: 0; background: #fff; color: var(--blau); font-weight: 600;
+  padding: .55em 0; border-bottom: 3px solid transparent; }
+.ansichten button.aktiv { border-bottom-color: var(--orange); color: var(--orange); }
+.titel-zeile { display: flex; align-items: center; gap: .5em; }
+.titel-zeile h3 { flex: 1; }
+.titel-zeile .klein-knopf { color: var(--blau); border-color: var(--rand); }
+
+/* Wochenansicht (Liste) */
+.woche-tag { margin-bottom: .2em; }
+.woche-tag h3 { margin: .8em 0 .25em; cursor: pointer; display: flex; align-items: center; gap: .4em; }
+.woche-tag h3::after { content: "›"; margin-left: auto; color: var(--grau); }
+.woche-tag.heute h3 { color: var(--orange); }
+.woche-tag.heute h3 span.marke { background: var(--orange); color: #fff; font-size: .7em; border-radius: 6px; padding: .1em .45em; }
+.woche-tag .liste li.leer { padding: .3em .7em; font-size: .9em; }
+
+/* Tagesansicht (Stundenplan) */
+#bereich-tag { padding: .4em .5em 6em; }
+#tag-ganztags:not(:empty) { margin-bottom: .5em; }
+.stunden { position: relative; background: #fff; border: 1px solid var(--rand); border-radius: 10px; }
+.stunde { height: 56px; border-top: 1px solid #eef1f6; display: flex; cursor: pointer; }
+.stunde:first-child { border-top: 0; }
+.stunde span { width: 3.4em; font-size: .75em; color: var(--grau); text-align: right; padding: .2em .6em 0 0; flex-shrink: 0; }
+.block { position: absolute; background: #fff1e9; border-left: 4px solid var(--orange); border-radius: 6px;
+  padding: .15em .35em; font-size: .8em; overflow: hidden; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.block b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.block small { color: var(--grau); }
+.jetzt { position: absolute; left: 3.4em; right: 0; height: 0; border-top: 2px solid var(--orange); z-index: 1; pointer-events: none; }
+.jetzt::before { content: ""; position: absolute; left: -5px; top: -6px; width: 10px; height: 10px; border-radius: 50%; background: var(--orange); }

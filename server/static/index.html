@@ -38,19 +38,33 @@
 <!-- Kalender -->
 <section id="ansicht-kalender" class="versteckt">
   <header class="kopf">
-    <button id="monat-zurueck" class="rund" aria-label="Voriger Monat">‹</button>
+    <button id="monat-zurueck" class="rund" aria-label="Zurück">‹</button>
     <h2 id="monat-titel"></h2>
-    <button id="monat-vor" class="rund" aria-label="Nächster Monat">›</button>
+    <button id="monat-vor" class="rund" aria-label="Weiter">›</button>
     <button id="heute" class="klein-knopf">Heute</button>
     <button id="menue" class="rund" aria-label="Einstellungen">☰</button>
   </header>
-  <div class="wochentage"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div>
-  <div id="raster" class="raster"></div>
-  <div class="tag-bereich">
-    <h3 id="tag-titel"></h3>
-    <ul id="tag-liste" class="liste"></ul>
-    <h3>Demnächst</h3>
-    <ul id="demnaechst" class="liste"></ul>
+  <nav class="ansichten" aria-label="Ansicht">
+    <button type="button" data-ansicht="monat">Monat</button>
+    <button type="button" data-ansicht="woche">Woche</button>
+    <button type="button" data-ansicht="tag">Tag</button>
+  </nav>
+  <div id="inhalt">
+    <div id="bereich-monat">
+      <div class="wochentage"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div>
+      <div id="raster" class="raster"></div>
+      <div class="tag-bereich">
+        <div class="titel-zeile"><h3 id="tag-titel"></h3><button type="button" id="zur-tagesansicht" class="klein-knopf">Tagesansicht ›</button></div>
+        <ul id="tag-liste" class="liste"></ul>
+        <h3>Demnächst</h3>
+        <ul id="demnaechst" class="liste"></ul>
+      </div>
+    </div>
+    <div id="bereich-woche" class="tag-bereich versteckt"></div>
+    <div id="bereich-tag" class="versteckt">
+      <ul id="tag-ganztags" class="liste"></ul>
+      <div id="stunden" class="stunden"></div>
+    </div>
   </div>
   <button id="neu" class="plus" aria-label="Neuer Termin">+</button>
 </section>
