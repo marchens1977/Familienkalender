@@ -1,0 +1,108 @@
+* { box-sizing: border-box; }
+:root {
+  /* Farben im Stil der New York Mets */
+  --blau: #002D72; --orange: #FF5910; --orange-dunkel: #d9460a;
+  --hell: #f1f4f9; --rand: #d5dce8; --text: #14213d; --grau: #5d6b82; --rot: #c0392b;
+}
+html, body { margin: 0; padding: 0; background: var(--hell); color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 16px; }
+.versteckt { display: none !important; }
+button, .knopf, input, select, textarea { font: inherit; }
+button, .knopf { border: 1px solid var(--rand); background: #fff; color: var(--text); border-radius: 10px;
+  padding: .6em 1em; cursor: pointer; text-decoration: none; display: inline-block; }
+button.haupt { background: var(--blau); color: #fff; border-color: var(--blau); }
+button.gefahr { color: var(--rot); border-color: var(--rot); }
+button.rund { border-radius: 50%; width: 2.4em; height: 2.4em; padding: 0; }
+.klein-knopf { padding: .35em .7em; font-size: .9em; }
+input, select, textarea { width: 100%; padding: .55em; border: 1px solid var(--rand); border-radius: 8px; background: #fff; }
+input[type=checkbox] { width: auto; }
+input[type=color] { height: 2.6em; padding: .2em; }
+label { display: block; margin: .6em 0; font-size: .92em; color: var(--grau); }
+label > input, label > select, label > textarea { margin-top: .25em; color: var(--text); }
+label.zeile { display: flex; align-items: center; gap: .5em; color: var(--text); }
+.klein { font-size: .85em; color: var(--grau); }
+.fehler { color: var(--rot); min-height: 1em; }
+.hinweis { background: #fff1e9; border: 1px solid #ffb48f; border-radius: 8px; padding: .6em; }
+.hinweis:empty { display: none; }
+
+/* Anmelden */
+.karte { max-width: 420px; margin: 2em auto; background: #fff; padding: 1.5em; border-radius: 16px;
+  border-top: 6px solid var(--orange);
+  box-shadow: 0 4px 18px rgba(0,0,0,.08); }
+.karte h1 { text-align: center; margin: .2em 0 .6em; color: var(--blau); }
+.karte .haupt { width: 100%; margin-top: .5em; }
+.logo { display: block; width: 72px; margin: 0 auto; }
+
+/* Kalender */
+.kopf { display: flex; align-items: center; gap: .4em; padding: .6em; background: var(--blau); color: #fff;
+  border-bottom: 4px solid var(--orange);
+  position: sticky; top: 0; z-index: 2; }
+.kopf h2 { flex: 1; margin: 0; font-size: 1.15em; text-align: center; }
+.kopf button { background: rgba(255,255,255,.15); color: #fff; border-color: rgba(255,255,255,.4); }
+.wochentage, .raster { display: grid; grid-template-columns: repeat(7, 1fr); }
+.wochentage span { text-align: center; font-size: .8em; color: var(--grau); padding: .3em 0; }
+.raster { gap: 1px; background: var(--rand); border-top: 1px solid var(--rand); border-bottom: 1px solid var(--rand); }
+.tag { background: #fff; min-height: 4.2em; padding: .2em; cursor: pointer; overflow: hidden; border: 0;
+  border-radius: 0; text-align: left; display: flex; flex-direction: column; }
+.tag.fremd { background: #fafbfc; color: #b0b8c1; }
+.tag .nr { font-size: .85em; font-weight: 600; }
+.tag.heute .nr { background: var(--orange); color: #fff; border-radius: 50%; width: 1.7em; height: 1.7em;
+  display: inline-flex; align-items: center; justify-content: center; }
+.tag.gewaehlt { outline: 2px solid var(--orange); outline-offset: -2px; }
+.tag .mini { font-size: .66em; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border-left: 3px solid var(--blau); padding-left: 2px; margin-top: 1px; }
+.tag .mehr { font-size: .62em; color: var(--grau); }
+.tag-bereich { padding: .4em .8em 6em; }
+.tag-bereich h3 { margin: .9em 0 .3em; font-size: 1em; }
+.liste { list-style: none; padding: 0; margin: 0; }
+.liste li { background: #fff; border: 1px solid var(--rand); border-left: 5px solid var(--orange); border-radius: 10px;
+  padding: .55em .7em; margin: .35em 0; cursor: pointer; }
+.liste li.leer { border-left-color: var(--rand); color: var(--grau); cursor: default; }
+.liste .t { font-weight: 600; }
+.liste .u { font-size: .85em; color: var(--grau); }
+.punkte { display: inline-flex; gap: 3px; margin-left: .3em; vertical-align: middle; }
+.punkte i { width: .7em; height: .7em; border-radius: 50%; display: inline-block; }
+.plus { position: fixed; right: 1.1em; bottom: 1.3em; width: 3.4em; height: 3.4em; border-radius: 50%;
+  background: var(--orange); color: #fff; font-size: 1.6em; border: 0; box-shadow: 0 4px 12px rgba(0,0,0,.25); padding: 0; }
+
+/* Dialoge */
+dialog { border: 0; border-radius: 16px; padding: 0; width: min(96vw, 480px); max-height: 92vh; }
+dialog::backdrop { background: rgba(0,0,0,.4); }
+dialog form, .dlg-inhalt { padding: 1em 1.1em; }
+dialog h3 { margin: .2em 0; }
+dialog h4 { margin: 1.2em 0 .2em; }
+.zwei { display: flex; gap: .6em; }
+.zwei > label { flex: 1; }
+.zwei > label.zeit { flex: .7; }
+fieldset { border: 1px solid var(--rand); border-radius: 8px; margin: .6em 0; }
+legend { font-size: .92em; color: var(--grau); }
+#teilnehmer label { display: inline-flex; align-items: center; gap: .3em; margin: .2em .8em .2em 0; color: var(--text); }
+.knoepfe { display: flex; gap: .5em; align-items: center; flex-wrap: wrap; margin-top: .6em; }
+.luecke { flex: 1; }
+.abstand { margin-top: 1.5em; }
+.benutzer .aktionen { display: flex; gap: .4em; flex-wrap: wrap; margin-top: .4em; }
+.benutzer .aktionen button { padding: .3em .7em; font-size: .85em; }
+.status { font-size: .75em; padding: .1em .5em; border-radius: 6px; background: #eef2f5; margin-left: .3em; }
+.status.pending { background: #fff3cd; }
+.status.disabled { background: #f8d7da; }
+
+/* Feinschliff fuer schmale Handys */
+.zwei > label { min-width: 0; }
+.zwei input { min-width: 0; }
+.kopf h2 { font-size: 1.05em; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.kopf { gap: .3em; }
+.kopf .klein-knopf { flex-shrink: 0; }
+.kopf .rund { flex-shrink: 0; }
+.dlg-inhalt form { padding: 0; }
+
+/* Mets-Akzente */
+a { color: var(--blau); font-weight: 600; }
+button.haupt:active { background: var(--orange); border-color: var(--orange); }
+.kopf .klein-knopf { background: var(--orange); border-color: var(--orange); font-weight: 600; }
+.tag-bereich h3, dialog h3, dialog h4 { color: var(--blau); }
+.tag-bereich h3 { border-bottom: 2px solid var(--orange); padding-bottom: .2em; }
+.wochentage span { color: var(--blau); font-weight: 600; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--orange); outline-offset: 0; border-color: var(--orange); }
+input[type=checkbox] { accent-color: var(--orange); }
+.plus:active { background: var(--orange-dunkel); }
+dialog { border-top: 6px solid var(--orange); }

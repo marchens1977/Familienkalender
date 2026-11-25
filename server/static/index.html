@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#002D72">
+<title>Familienkalender</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<!-- Anmelden / Registrieren -->
+<section id="ansicht-login" class="karte versteckt">
+  <img src="/icon.svg" alt="" class="logo">
+  <h1>Familienkalender</h1>
+  <p id="login-hinweis" class="hinweis"></p>
+
+  <form id="form-login">
+    <label>Benutzername <input name="username" autocomplete="username" required></label>
+    <label>Passwort <input name="password" type="password" autocomplete="current-password" required></label>
+    <button type="submit" class="haupt">Anmelden</button>
+    <p class="klein">Noch kein Konto? <a href="#" id="zu-registrieren">Profil anlegen</a></p>
+  </form>
+
+  <form id="form-registrieren" class="versteckt">
+    <label>Dein Name (wird im Kalender angezeigt) <input name="display_name" maxlength="40" required></label>
+    <label>Benutzername (zum Anmelden) <input name="username" autocomplete="username" pattern="[A-Za-z0-9._\-]{3,30}" required></label>
+    <label>Passwort (mind. 8 Zeichen) <input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+    <label>Passwort wiederholen <input name="password2" type="password" autocomplete="new-password" minlength="8" required></label>
+    <button type="submit" class="haupt">Profil anlegen</button>
+    <p class="klein"><a href="#" id="zu-login">Zurück zum Anmelden</a></p>
+  </form>
+  <p id="login-fehler" class="fehler"></p>
+</section>
+
+<!-- Kalender -->
+<section id="ansicht-kalender" class="versteckt">
+  <header class="kopf">
+    <button id="monat-zurueck" class="rund" aria-label="Voriger Monat">‹</button>
+    <h2 id="monat-titel"></h2>
+    <button id="monat-vor" class="rund" aria-label="Nächster Monat">›</button>
+    <button id="heute" class="klein-knopf">Heute</button>
+    <button id="menue" class="rund" aria-label="Einstellungen">☰</button>
+  </header>
+  <div class="wochentage"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div>
+  <div id="raster" class="raster"></div>
+  <div class="tag-bereich">
+    <h3 id="tag-titel"></h3>
+    <ul id="tag-liste" class="liste"></ul>
+    <h3>Demnächst</h3>
+    <ul id="demnaechst" class="liste"></ul>
+  </div>
+  <button id="neu" class="plus" aria-label="Neuer Termin">+</button>
+</section>
+
+<!-- Termin-Formular -->
+<dialog id="dlg-termin">
+  <form id="form-termin" method="dialog">
+    <h3 id="termin-ueberschrift">Termin</h3>
+    <label>Titel <input name="title" maxlength="120" required></label>
+    <label class="zeile"><input type="checkbox" name="all_day" checked> Ganztägig</label>
+    <div class="zwei">
+      <label>Von <input type="date" name="start_date" required></label>
+      <label class="zeit">Uhrzeit <input type="time" name="start_time"></label>
+    </div>
+    <div class="zwei">
+      <label>Bis <input type="date" name="end_date"></label>
+      <label class="zeit">Uhrzeit <input type="time" name="end_time"></label>
+    </div>
+    <label>Wiederholen
+      <select name="repeat">
+        <option value="none">nie</option>
+        <option value="weekly">jede Woche</option>
+        <option value="monthly">jeden Monat</option>
+        <option value="yearly">jedes Jahr (z. B. Geburtstag)</option>
+      </select>
+    </label>
+    <label id="bis-zeile" class="versteckt">Wiederholen bis (leer = immer) <input type="date" name="repeat_until"></label>
+    <label>Ort <input name="location" maxlength="120"></label>
+    <fieldset><legend>Wer ist dabei?</legend><div id="teilnehmer"></div></fieldset>
+    <label>Notiz <textarea name="notes" maxlength="2000" rows="3"></textarea></label>
+    <p id="termin-info" class="klein"></p>
+    <p id="termin-fehler" class="fehler"></p>
+    <div class="knoepfe">
+      <button type="button" id="termin-loeschen" class="gefahr">Löschen</button>
+      <span class="luecke"></span>
+      <button type="button" id="termin-abbrechen">Abbrechen</button>
+      <button type="submit" class="haupt">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Einstellungen -->
+<dialog id="dlg-einstellungen">
+  <div class="dlg-inhalt">
+    <div class="knoepfe"><h3>Einstellungen</h3><span class="luecke"></span><button id="einst-zu" class="rund" aria-label="Schließen">✕</button></div>
+
+    <form id="form-profil">
+      <h4>Mein Profil</h4>
+      <label>Name <input name="display_name" maxlength="40" required></label>
+      <label>Meine Farbe <input name="color" type="color"></label>
+      <details>
+        <summary>Passwort ändern</summary>
+        <label>Altes Passwort <input name="old_password" type="password" autocomplete="current-password"></label>
+        <label>Neues Passwort <input name="new_password" type="password" autocomplete="new-password" minlength="8"></label>
+      </details>
+      <button type="submit" class="haupt">Profil speichern</button>
+      <p id="profil-meldung" class="klein"></p>
+    </form>
+
+    <div id="verwaltung" class="versteckt">
+      <h4>Verwaltung: Wer darf rein?</h4>
+      <p class="klein">Neue Profile müssen hier freigegeben werden. Erst dann kann sich die Person anmelden.</p>
+      <ul id="benutzer-liste" class="liste"></ul>
+    </div>
+
+    <h4>Daten sichern</h4>
+    <p class="klein">Export lädt alle Termine als Datei herunter. Der Pi macht zusätzlich jeden Tag eine automatische Sicherung.</p>
+    <div class="knoepfe">
+      <a id="export" class="knopf" href="/api/export" download>Exportieren</a>
+      <label id="import-knopf" class="knopf versteckt">Importieren<input id="import-datei" type="file" accept=".json,application/json" hidden></label>
+    </div>
+    <p id="import-meldung" class="klein"></p>
+
+    <div class="knoepfe abstand"><button id="abmelden">Abmelden</button></div>
+  </div>
+</dialog>
+
+<script src="/app.js"></script>
+</body>
+</html>
