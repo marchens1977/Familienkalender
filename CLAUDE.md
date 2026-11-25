@@ -113,7 +113,7 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 ## 8. Test-Liste für dich (am Handy abhaken)
 
 - [x] Pi: Installationsbefehl aus der README ausgeführt, Meldung „FERTIG ✅“ (2026-11-25)
-- [ ] Pi: Installationsskript nach dem Update **noch einmal** ausgeführt → Meldung „Automatische Updates: stündlich ✅“
+- [x] Pi: Installationsskript nach dem Update **noch einmal** ausgeführt (2026-11-25) → Meldung „Automatische Updates: stündlich ✅“
 - [ ] Verwalter: ☰ → „Familienmitglied anlegen“ → Zugangsdaten erscheinen → „Per WhatsApp senden“ öffnet WhatsApp mit dem Text
 - [ ] Familienmitglied: Anmeldung mit Startpasswort → muss eigenes Passwort wählen → sieht den Kalender
 - [ ] Familienmitglied außerhalb: WireGuard-Datei importiert, VPN an → Link öffnet den Kalender
@@ -139,3 +139,4 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 | 2026-11-25 | Datenschutz: alle Adressen, Geräte-/Kontodaten und echten Namen entfernt, Skripte erkennen Netz/Adresse selbst, Datenschutz-Test ergänzt. Design auf Mets-Farben (Blau/Orange) umgestellt |
 | 2026-11-25 | Auf dem Pi installiert, „FERTIG ✅“ (Nutzer-Foto) |
 | 2026-11-25 | Verwalter legt Mitglieder mit Startpasswort an, WhatsApp-Text, Pflicht-Passwortwechsel; stündliches Auto-Update mit Rückfall; Handy lädt neue Version selbst. 19 Server-/Skript-Tests + Browser-Test grün |
+| 2026-11-25 | Update auf dem Pi eingespielt (4b6fc19), Auto-Update-Zeitplan aktiv ✅ (Nutzer-Foto) |
