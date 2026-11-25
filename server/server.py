@@ -100,6 +100,9 @@ class Datenbank:
                 );
                 """
             )
+            spalten = [z[1] for z in db.execute("PRAGMA table_info(users)")]
+            if "must_change_pw" not in spalten:
+                db.execute("ALTER TABLE users ADD COLUMN must_change_pw INTEGER NOT NULL DEFAULT 0")
 
     def verbindung(self):
         db = sqlite3.connect(self.pfad, timeout=10)
@@ -139,6 +142,33 @@ def passwort_pruefen(passwort, gespeichert):
         return hmac.compare_digest(neu.hex(), h)
     except (ValueError, TypeError):
         return False
+
+
+PW_ZEICHEN = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # ohne leicht verwechselbare Zeichen
+
+
+def startpasswort():
+    return "".join(secrets.choice(PW_ZEICHEN) for _ in range(10))
+
+
+def programm_version():
+    """Kennung der aktuellen Programmversion (aendert sich bei jedem Update der Oberflaeche/des Servers)."""
+    h = hashlib.sha256()
+    for datei in sorted(set(d for d, _ in STATIC_DATEIEN.values())):
+        with open(os.path.join(STATIC, datei), "rb") as f:
+            h.update(f.read())
+    with open(os.path.abspath(__file__), "rb") as f:
+        h.update(f.read())
+    return h.hexdigest()[:12]
+
+
+VERSION = programm_version()
+
+
+def benutzername_pruefen(name):
+    if not isinstance(name, str) or not BENUTZERNAME.match(name):
+        raise Fehler(400, "Benutzername: 3-30 Zeichen, nur Buchstaben, Ziffern, . _ - (keine Leerzeichen/Umlaute)")
+    return name
 
 
 def token_hash(token):
@@ -244,7 +274,8 @@ def termin_json(r):
 def benutzer_json(r, mit_details=False):
     d = {"id": r["id"], "display_name": r["display_name"], "color": r["color"]}
     if mit_details:
-        d.update(username=r["username"], role=r["role"], status=r["status"], created_at=r["created_at"])
+        d.update(username=r["username"], role=r["role"], status=r["status"], created_at=r["created_at"],
+                 must_change_pw=bool(r["must_change_pw"]))
     return d
 
 
@@ -422,13 +453,11 @@ class Handler(BaseHTTPRequestHandler):
 
         if teile == ["status"] and m == "GET":
             anzahl = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-            return self.antwort(200, {"hat_benutzer": anzahl > 0})
+            return self.antwort(200, {"hat_benutzer": anzahl > 0, "version": VERSION})
 
         if teile == ["registrieren"] and m == "POST":
             d = self.json_lesen()
-            name = d.get("username") or ""
-            if not isinstance(name, str) or not BENUTZERNAME.match(name):
-                raise Fehler(400, "Benutzername: 3-30 Zeichen, nur Buchstaben, Ziffern, . _ -")
+            name = benutzername_pruefen(d.get("username") or "")
             anzeige = text(d.get("display_name"), "Anzeigename", 40, pflicht=True)
             pw = passwort_regel(d.get("password"))
             if db.execute("SELECT 1 FROM users WHERE username=?", (name,)).fetchone():
@@ -481,9 +510,12 @@ class Handler(BaseHTTPRequestHandler):
                     raise Fehler(400, "Farbe ist ungueltig.")
                 db.execute("UPDATE users SET display_name=?, color=? WHERE id=?", (anzeige, farbe, u["id"]))
                 if d.get("new_password"):
-                    if not passwort_pruefen(str(d.get("old_password") or ""), u["pw_hash"]):
+                    # Beim Startpasswort (erste Anmeldung) wird das alte nicht nochmal abgefragt
+                    if not u["must_change_pw"] and not passwort_pruefen(str(d.get("old_password") or ""), u["pw_hash"]):
                         raise Fehler(400, "Das alte Passwort stimmt nicht.")
-                    db.execute("UPDATE users SET pw_hash=? WHERE id=?",
+                    if passwort_pruefen(str(d["new_password"]), u["pw_hash"]):
+                        raise Fehler(400, "Bitte ein anderes Passwort als das bisherige waehlen.")
+                    db.execute("UPDATE users SET pw_hash=?, must_change_pw=0 WHERE id=?",
                                (passwort_hash(passwort_regel(d["new_password"])), u["id"]))
                     # andere Geraete abmelden
                     db.execute("DELETE FROM sessions WHERE user_id=? AND token_hash<>?",
@@ -582,6 +614,22 @@ class Handler(BaseHTTPRequestHandler):
         if teile == ["admin", "benutzer"] and m == "GET":
             rows = db.execute("SELECT * FROM users ORDER BY status='active', created_at").fetchall()
             return self.antwort(200, [benutzer_json(r, True) for r in rows])
+        if teile == ["admin", "benutzer"] and m == "POST":
+            # Verwalter legt ein Familienmitglied direkt an (sofort freigegeben, mit Startpasswort)
+            d = self.json_lesen()
+            name = benutzername_pruefen(d.get("username") or "")
+            anzeige = text(d.get("display_name"), "Name", 40, pflicht=True)
+            pw = passwort_regel(d.get("password")) if d.get("password") else startpasswort()
+            if db.execute("SELECT 1 FROM users WHERE username=?", (name,)).fetchone():
+                raise Fehler(409, "Diesen Benutzernamen gibt es schon.")
+            anzahl = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            cur = db.execute(
+                "INSERT INTO users(username, display_name, pw_hash, color, role, status, created_at, must_change_pw) "
+                "VALUES(?,?,?,?,?,?,?,1)",
+                (name, anzeige, passwort_hash(pw), FARBEN[anzahl % len(FARBEN)],
+                 "admin" if d.get("admin") else "member", "active", jetzt_text()))
+            r = db.execute("SELECT * FROM users WHERE id=?", (cur.lastrowid,)).fetchone()
+            return self.antwort(201, dict(benutzer_json(r, True), startpasswort=pw))
         if len(teile) == 3 and teile[1] == "benutzer" and teile[2].isdigit():
             bid = int(teile[2])
             ziel = db.execute("SELECT * FROM users WHERE id=?", (bid,)).fetchone()
@@ -605,13 +653,16 @@ class Handler(BaseHTTPRequestHandler):
                 elif aktion == "zum_mitglied":
                     db.execute("UPDATE users SET role='member' WHERE id=?", (bid,))
                 elif aktion == "passwort":
-                    db.execute("UPDATE users SET pw_hash=? WHERE id=?",
-                               (passwort_hash(passwort_regel(d.get("password"))), bid))
+                    neu = passwort_regel(d.get("password")) if d.get("password") else startpasswort()
+                    db.execute("UPDATE users SET pw_hash=?, must_change_pw=1 WHERE id=?", (passwort_hash(neu), bid))
                     db.execute("DELETE FROM sessions WHERE user_id=?", (bid,))
                 else:
                     raise Fehler(400, "Unbekannte Aktion.")
                 r = db.execute("SELECT * FROM users WHERE id=?", (bid,)).fetchone()
-                return self.antwort(200, benutzer_json(r, True))
+                antwort = benutzer_json(r, True)
+                if aktion == "passwort":
+                    antwort["startpasswort"] = neu
+                return self.antwort(200, antwort)
         raise Fehler(404, "Unbekannte Anfrage.")
 
 

@@ -5,6 +5,9 @@ Kein fremder Dienst, keine Cloud: Die Termine liegen nur auf dem Pi.
 
 - Jede Person legt im Handy-Browser ein eigenes **Profil** an (Name, Farbe, Passwort).
 - Neue Profile müssen vom **Verwalter freigegeben** werden. Erst dann kommt man rein.
+- Oder einfacher: Der **Verwalter legt Familienmitglieder selbst an** und schickt Link, Benutzername und
+  Startpasswort mit einem Knopfdruck **per WhatsApp**. Beim ersten Anmelden wählt jeder sein eigenes Passwort.
+- **Automatische Updates:** Der Pi holt neue Versionen stündlich von selbst; die Handys laden sie automatisch.
 - Alle Freigegebenen sehen und pflegen denselben Kalender (Termine, ganztägig oder mit Uhrzeit,
   mehrtägig, Wiederholung wöchentlich/monatlich/jährlich, „Wer ist dabei?“).
 - Erreichbar nur im **Heimnetz** oder unterwegs über ein **VPN** ins Heimnetz.
@@ -28,6 +31,8 @@ Adresse an, die du am Handy öffnest. **Sofort** das eigene Profil anlegen (das 
 > Ein automatischer Test (`test/test_datenschutz.py`) prüft das bei jedem Testlauf.
 
 ## Aktualisieren / Prüfen
+
+Updates kommen automatisch (stündlich). Sofort von Hand oder zum Nachsehen:
 
 ```bash
 bash ~/familienkalender/pi/aktualisieren.sh

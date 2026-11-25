@@ -111,8 +111,28 @@
     </form>
 
     <div id="verwaltung" class="versteckt">
-      <h4>Verwaltung: Wer darf rein?</h4>
-      <p class="klein">Neue Profile müssen hier freigegeben werden. Erst dann kann sich die Person anmelden.</p>
+      <h4>Familienmitglied anlegen</h4>
+      <form id="form-mitglied">
+        <label>Name (wird im Kalender angezeigt) <input name="display_name" maxlength="40" required></label>
+        <label>Benutzername (zum Anmelden) <input name="username" pattern="[A-Za-z0-9._\-]{3,30}" required></label>
+        <label class="zeile"><input type="checkbox" name="admin"> darf auch verwalten (Verwalter)</label>
+        <button type="submit" class="haupt">Anlegen</button>
+        <p id="mitglied-fehler" class="fehler"></p>
+      </form>
+
+      <div id="zugang" class="zugang versteckt">
+        <h4 id="zugang-titel">Zugangsdaten</h4>
+        <p class="klein">Das Startpasswort wird nur jetzt angezeigt. Gleich weitergeben:</p>
+        <pre id="zugang-text"></pre>
+        <div class="knoepfe">
+          <a id="zugang-whatsapp" class="knopf whatsapp" href="#" target="_blank" rel="noopener">Per WhatsApp senden</a>
+          <button type="button" id="zugang-kopieren">Kopieren</button>
+          <button type="button" id="zugang-zu">Fertig</button>
+        </div>
+      </div>
+
+      <h4>Wer darf rein?</h4>
+      <p class="klein">Selbst angelegte Profile müssen hier freigegeben werden. Erst dann kann sich die Person anmelden.</p>
       <ul id="benutzer-liste" class="liste"></ul>
     </div>
 
@@ -126,6 +146,18 @@
 
     <div class="knoepfe abstand"><button id="abmelden">Abmelden</button></div>
   </div>
+</dialog>
+
+<!-- Erstes eigenes Passwort (nach Anmeldung mit Startpasswort) -->
+<dialog id="dlg-erstpasswort">
+  <form id="form-erstpasswort" class="dlg-inhalt">
+    <h3>Willkommen!</h3>
+    <p>Bitte wähle jetzt dein eigenes Passwort. Das Startpasswort gilt danach nicht mehr.</p>
+    <label>Neues Passwort (mind. 8 Zeichen) <input name="pw1" type="password" autocomplete="new-password" minlength="8" required></label>
+    <label>Neues Passwort wiederholen <input name="pw2" type="password" autocomplete="new-password" minlength="8" required></label>
+    <p id="erstpasswort-fehler" class="fehler"></p>
+    <button type="submit" class="haupt">Passwort speichern</button>
+  </form>
 </dialog>
 
 <script src="/app.js"></script>

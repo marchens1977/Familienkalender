@@ -29,15 +29,21 @@ alle Freigegebenen pflegen einen gemeinsamen Kalender. Bedienung im Handy-Browse
 
 ## 3. Aktueller Stand (2026-11-25)
 
-Erste Version fertig und automatisch getestet (in der Cloud-Sitzung, **noch nicht auf dem echten Pi**).
+Läuft auf dem Pi (installiert 2026-11-25). Neue Funktionen werden automatisch getestet und kommen per Auto-Update auf den Pi.
 
 - Anmelden/Registrieren, erstes Profil = Verwalter, weitere warten auf Freigabe
-- Verwaltung: freigeben, ablehnen, sperren, löschen, zum Verwalter/Mitglied machen, neues Passwort setzen
+- Verwaltung: freigeben, ablehnen, sperren, löschen, zum Verwalter/Mitglied machen, neues Startpasswort
+- **Verwalter legt Familienmitglieder direkt an** (Name, Benutzername wird vorgeschlagen, optional Verwalter).
+  Server erzeugt ein Startpasswort (10 Zeichen, ohne verwechselbare Zeichen). Fertiger Text mit Link,
+  Benutzername, Startpasswort und Anleitung → Knopf „Per WhatsApp senden“ (wa.me) oder „Kopieren“.
+- Beim ersten Anmelden mit Startpasswort **muss** ein eigenes Passwort gewählt werden (Dialog nicht wegdrückbar)
 - Profil: Anzeigename, eigene Farbe, Passwort ändern
 - Monatsansicht (wischen oder Pfeile), Tagesliste, „Demnächst“ (30 Tage)
 - Termine: ganztägig oder mit Uhrzeit, mehrtägig, Ort, Notiz, „Wer ist dabei?“, Wiederholung
   (wöchentlich, monatlich, jährlich, optional „bis“)
 - Alle 60 Sekunden und beim Zurückkehren in die App werden Änderungen der anderen geladen
+- **Automatische Updates:** Pi prüft stündlich GitHub (`main`). Startet die neue Version nicht, holt er die alte zurück.
+  Offene Kalender am Handy merken eine neue Version (`/api/status` → `version`) und laden sich selbst neu.
 - Export (alle Mitglieder) als JSON-Datei, Import (nur Verwalter, überspringt Doppelte, überschreibt nichts)
 - Tägliche Sicherung der Datenbank auf dem Pi: `~/familienkalender-daten/sicherungen/` (letzte 14)
 
@@ -50,7 +56,11 @@ Erste Version fertig und automatisch getestet (in der Cloud-Sitzung, **noch nich
 - Standard-Port **8502** (änderbar über `FK_PORT`). Firewall (ufw): nur aus dem eigenen Heimnetz; das Netz erkennt
   `pi/installieren.sh` auf dem Pi automatisch (änderbar über `FK_NETZ`). VPN-Geräte bekommen Heimnetz-Adressen.
 - Zugriffsschutz doppelt: (1) nur Heimnetz/VPN, (2) Konto mit Passwort + Freigabe durch Verwalter.
-  Wer von unterwegs zugreifen soll, braucht eine eigene VPN-Verbindung ins Heimnetz.
+- **Familie von außerhalb (Entscheidung 2026-11-25): eigenes VPN pro Person** (WireGuard aus dem Router), nicht
+  übers offene Internet. Der Nutzer schickt jedem die VPN-Datei und den Zugangstext per WhatsApp.
+- **Wichtig wegen Auto-Update:** Was auf `main` landet, ist spätestens nach einer Stunde live bei der ganzen Familie.
+  Deshalb vor jedem Speichern auf `main` immer `bash test/alle_tests.sh` – nur bei „alles OK“ speichern.
+- Startpasswort per WhatsApp ist vertretbar, weil es beim ersten Anmelden ersetzt werden muss.
 - Passwörter nur als scrypt-Hash gespeichert. Sitzung per Cookie (HttpOnly, SameSite=Strict, 90 Tage).
   Schreibzugriffe brauchen die Kopfzeile `X-Familienkalender: 1` (Schutz gegen fremde Webseiten).
   Max. 10 Fehlversuche pro 15 Minuten beim Anmelden.
@@ -67,7 +77,8 @@ Erste Version fertig und automatisch getestet (in der Cloud-Sitzung, **noch nich
 | `server/server.py` | Server + Schnittstelle (`/api/...`) + Datenbank + tägliche Sicherung |
 | `server/static/` | Oberfläche: `index.html`, `app.js`, `style.css`, `icon.svg`, `manifest.json` |
 | `pi/installieren.sh` | Einmalige Einrichtung auf dem Pi (Dienst `familienkalender`, Firewall) |
-| `pi/aktualisieren.sh` | Neueste Version holen + Neustart |
+| `pi/aktualisieren.sh` | Neueste Version sofort von Hand holen + Neustart |
+| `pi/auto_aktualisieren.sh` | Stündliches Auto-Update (Zeitplan `familienkalender-update.timer`), mit Rückkehr zur alten Version bei Fehler |
 | `pi/pruefen.sh` | Läuft der Dienst? Letzte Sicherungen? |
 | `test/` | Automatische Tests |
 
@@ -83,8 +94,12 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - `test/test_server.py` (Python unittest, 12 Tests): Registrierung, Freigabe, Rechte, Sperren, Anmeldebremse,
   Schutz gegen fremde Seiten, Termine anlegen/ändern/löschen, Eingabeprüfungen, Profil/Passwort,
   Export/Import, Verwalter-Aktionen, Sicherung. Jeweils mit leerer Temp-Datenbank.
-- `test/oberflaeche_test.js` (Playwright/Chromium im Handy-Format): kompletter Ablauf mit zwei Personen
-  (registrieren, Termin anlegen, Geburtstag jährlich, Freigabe, zweite Person bearbeitet, Export, Löschen).
+- Server-Tests auch für: Mitglied anlegen, Startpasswort, Pflicht-Passwortwechsel, Versionskennung, Ergänzung alter Datenbanken.
+- `test/test_auto_update.py`: prüft `pi/auto_aktualisieren.sh` mit Test-Git und Attrappen (nichts Neues / gutes Update /
+  kaputtes Update → zurück zur alten Version).
+- `test/oberflaeche_test.js` (Playwright/Chromium im Handy-Format): kompletter Ablauf mit drei Personen
+  (registrieren, Termin anlegen, Geburtstag jährlich, Freigabe, zweite Person bearbeitet, Export,
+  Verwalter legt Mitglied an + WhatsApp-Text, Anmeldung mit Startpasswort + eigenes Passwort, Löschen).
 - Pi-Skripte: nur Tippfehler-Prüfung (`bash -n`), echter Test auf dem Pi durch den Nutzer.
 
 ## 7. Offene Punkte / Ideen
@@ -92,12 +107,17 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - Einzelnen Termin aus einer Serie löschen/verschieben (geht noch nicht)
 - Erinnerungen/Benachrichtigungen aufs Handy (bräuchte https bzw. eigene Lösung)
 - Wochen- oder Listenansicht, Suche
-- Eintrag im privaten Server-Projekt des Nutzers (Apps auf dem Pi, Firewall-Port) nach erfolgreicher Installation
+- Einladungs-Link mit Einmal-Code (noch weniger Tipparbeit als Benutzername + Startpasswort)
 - Eventuell https, falls gewünscht
 
 ## 8. Test-Liste für dich (am Handy abhaken)
 
-- [ ] Pi: Installationsbefehl aus der README ausgeführt, Meldung „FERTIG ✅“
+- [x] Pi: Installationsbefehl aus der README ausgeführt, Meldung „FERTIG ✅“ (2026-11-25)
+- [ ] Pi: Installationsskript nach dem Update **noch einmal** ausgeführt → Meldung „Automatische Updates: stündlich ✅“
+- [ ] Verwalter: ☰ → „Familienmitglied anlegen“ → Zugangsdaten erscheinen → „Per WhatsApp senden“ öffnet WhatsApp mit dem Text
+- [ ] Familienmitglied: Anmeldung mit Startpasswort → muss eigenes Passwort wählen → sieht den Kalender
+- [ ] Familienmitglied außerhalb: WireGuard-Datei importiert, VPN an → Link öffnet den Kalender
+- [ ] Auto-Update: nach der nächsten Änderung durch Claude ist sie spätestens nach ~1 Stunde da, ohne dass du etwas tust
 - [ ] Handy (zu Hause, VPN aus): die Adresse, die das Installationsskript am Ende anzeigt, öffnet die Anmeldeseite
 - [ ] Design: Kopfzeile Blau mit oranger Linie, „+“-Knopf und heutiger Tag Orange
 - [ ] Eigenes Profil angelegt → du bist Verwalter und siehst den Kalender
@@ -117,3 +137,5 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 |---|---|
 | 2026-11-25 | Projekt gestartet: Server, Oberfläche, Pi-Skripte, Tests. Alle automatischen Tests grün. Noch nicht auf dem Pi installiert |
 | 2026-11-25 | Datenschutz: alle Adressen, Geräte-/Kontodaten und echten Namen entfernt, Skripte erkennen Netz/Adresse selbst, Datenschutz-Test ergänzt. Design auf Mets-Farben (Blau/Orange) umgestellt |
+| 2026-11-25 | Auf dem Pi installiert, „FERTIG ✅“ (Nutzer-Foto) |
+| 2026-11-25 | Verwalter legt Mitglieder mit Startpasswort an, WhatsApp-Text, Pflicht-Passwortwechsel; stündliches Auto-Update mit Rückfall; Handy lädt neue Version selbst. 19 Server-/Skript-Tests + Browser-Test grün |

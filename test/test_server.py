@@ -211,6 +211,65 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(admin("DELETE", "/api/admin/benutzer/%d" % sam_id)[0], 200)
         self.assertEqual(sam("GET", "/api/termine")[0], 401)
 
+    def test_verwalter_legt_mitglied_an(self):
+        admin, _, _ = self.konto("alex")
+        # ohne Passwort: Server erzeugt ein Startpasswort
+        s, d, _ = admin("POST", "/api/admin/benutzer", {"username": "kim", "display_name": "Kim"})
+        self.assertEqual(s, 201, d)
+        self.assertEqual((d["status"], d["role"], d["must_change_pw"]), ("active", "member", True))
+        start = d["startpasswort"]
+        self.assertEqual(len(start), 10)
+        self.assertEqual(admin("POST", "/api/admin/benutzer", {"username": "KIM", "display_name": "x"})[0], 409)
+        self.assertEqual(admin("POST", "/api/admin/benutzer", {"username": "k m", "display_name": "x"})[0], 400)
+        # Mitglied darf niemanden anlegen
+        kim = self.neu()
+        s, d, _ = kim("POST", "/api/anmelden", {"username": "kim", "password": start})
+        self.assertEqual(s, 200)
+        self.assertTrue(d["must_change_pw"])
+        self.assertEqual(kim("POST", "/api/admin/benutzer", {"username": "x1x", "display_name": "x"})[0], 403)
+        # erstes eigenes Passwort: altes muss nicht nochmal eingegeben werden, darf aber nicht gleich sein
+        self.assertEqual(kim("PUT", "/api/ich", {"new_password": start})[0], 400)
+        s, d, _ = kim("PUT", "/api/ich", {"new_password": "kimseigenes1"})
+        self.assertEqual(s, 200, d)
+        self.assertFalse(d["must_change_pw"])
+        # danach wird das alte Passwort wieder verlangt
+        self.assertEqual(kim("PUT", "/api/ich", {"new_password": "nochmalneu1"})[0], 400)
+        self.assertEqual(self.neu()("POST", "/api/anmelden", {"username": "kim", "password": start})[0], 401)
+        # Verwalter setzt Passwort zurueck -> neues Startpasswort, Kim wird abgemeldet
+        kim_id = [b for b in admin("GET", "/api/admin/benutzer")[1] if b["username"] == "kim"][0]["id"]
+        s, d, _ = admin("POST", "/api/admin/benutzer/%d" % kim_id, {"aktion": "passwort"})
+        self.assertEqual(s, 200)
+        self.assertTrue(d["must_change_pw"])
+        self.assertEqual(kim("GET", "/api/ich")[0], 401)
+        self.assertEqual(self.neu()("POST", "/api/anmelden", {"username": "kim", "password": d["startpasswort"]})[0], 200)
+        # als Verwalter anlegen
+        s, d, _ = admin("POST", "/api/admin/benutzer", {"username": "sam", "display_name": "Sam", "admin": True,
+                                                         "password": "sams-start1"})
+        self.assertEqual((s, d["role"], d["startpasswort"]), (201, "admin", "sams-start1"))
+
+    def test_version_fuer_automatische_aktualisierung(self):
+        s, d, _ = self.neu()("GET", "/api/status")
+        self.assertEqual(s, 200)
+        self.assertEqual(len(d["version"]), 12)
+
+    def test_alte_datenbank_wird_ergaenzt(self):
+        import sqlite3
+        ordner = tempfile.mkdtemp()
+        try:
+            db = sqlite3.connect(os.path.join(ordner, "kalender.db"))
+            db.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE COLLATE NOCASE, "
+                       "display_name TEXT NOT NULL, pw_hash TEXT NOT NULL, color TEXT NOT NULL, "
+                       "role TEXT NOT NULL DEFAULT 'member', status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL)")
+            db.commit()
+            db.close()
+            fk.Datenbank(ordner)
+            db = sqlite3.connect(os.path.join(ordner, "kalender.db"))
+            spalten = [z[1] for z in db.execute("PRAGMA table_info(users)")]
+            db.close()
+            self.assertIn("must_change_pw", spalten)
+        finally:
+            shutil.rmtree(ordner)
+
     def test_sicherung(self):
         admin, _, _ = self.konto("alex")
         admin("POST", "/api/termine", {"title": "x", "start_date": "2026-12-01"})

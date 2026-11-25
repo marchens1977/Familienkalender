@@ -226,7 +226,24 @@ async function start() {
   zustand.gewaehlt = heute();
   zeige("#ansicht-kalender");
   await ladeDaten();
+  if (zustand.ich.must_change_pw) {
+    $("#form-erstpasswort").reset();
+    $("#erstpasswort-fehler").textContent = "";
+    $("#dlg-erstpasswort").showModal();
+  }
 }
+
+// Erstes eigenes Passwort
+$("#dlg-erstpasswort").addEventListener("cancel", (ev) => ev.preventDefault()); // nicht wegdrücken
+$("#form-erstpasswort").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const f = ev.target;
+  if (f.pw1.value !== f.pw2.value) { $("#erstpasswort-fehler").textContent = "Die Passwörter sind nicht gleich."; return; }
+  try {
+    zustand.ich = await api("PUT", "/api/ich", { new_password: f.pw1.value });
+    $("#dlg-erstpasswort").close();
+  } catch (e) { $("#erstpasswort-fehler").textContent = e.message; }
+});
 
 // ------------------------------------------------------------ Anmelden / Registrieren
 function wechsle(registrieren) {
@@ -399,6 +416,8 @@ $("#menue").addEventListener("click", async () => {
   formP.color.value = zustand.ich.color;
   $("#profil-meldung").textContent = "";
   $("#import-meldung").textContent = "";
+  $("#zugang").classList.add("versteckt");
+  $("#mitglied-fehler").textContent = "";
   const admin = zustand.ich.role === "admin";
   $("#verwaltung").classList.toggle("versteckt", !admin);
   $("#import-knopf").classList.toggle("versteckt", !admin);
@@ -436,6 +455,10 @@ async function zeigeBenutzer() {
     s.textContent = STATUS[b.status] || b.status;
     t.append(s);
     li.append(t);
+    if (b.must_change_pw) {
+      const h = document.createElement("div"); h.className = "u"; h.textContent = "hat sich noch nicht mit eigenem Passwort angemeldet";
+      li.append(h);
+    }
     if (b.id === zustand.ich.id) {
       const u = document.createElement("div"); u.className = "u"; u.textContent = "Das bist du."; li.append(u);
     } else {
@@ -454,9 +477,9 @@ async function zeigeBenutzer() {
       if (b.status === "active") knopf("Sperren", () => aktion("sperren"), true);
       if (b.status === "active") knopf(b.role === "admin" ? "Zum Mitglied machen" : "Zum Verwalter machen",
         () => aktion(b.role === "admin" ? "zum_mitglied" : "zum_verwalter"));
-      if (b.status === "active") knopf("Neues Passwort", async () => {
-        const pw = prompt("Neues Passwort für " + b.display_name + " (mind. 8 Zeichen):");
-        if (pw) { await aktion("passwort", { password: pw }); alert("Passwort geändert. Sag es " + b.display_name + " persönlich."); }
+      if (b.status === "active") knopf("Neues Startpasswort", async () => {
+        if (!confirm("Für " + b.display_name + " ein neues Startpasswort erzeugen? Das alte gilt dann nicht mehr.")) return;
+        zeigeZugang(await aktion("passwort"));
       });
       knopf(b.status === "pending" ? "Ablehnen" : "Löschen", async () => {
         if (confirm("Profil von " + b.display_name + " wirklich löschen? Die Termine bleiben erhalten.")) {
@@ -468,6 +491,65 @@ async function zeigeBenutzer() {
     ul.append(li);
   }
 }
+
+// Benutzername aus dem Namen vorschlagen (klein, ohne Umlaute/Leerzeichen)
+const formM = $("#form-mitglied");
+formM.display_name.addEventListener("input", () => {
+  if (formM.username.dataset.selbst) return;
+  formM.username.value = formM.display_name.value.toLowerCase()
+    .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+    .replace(/[^a-z0-9._-]+/g, "").slice(0, 30);
+});
+formM.username.addEventListener("input", () => { formM.username.dataset.selbst = "1"; });
+
+function zugangsText(name, benutzername, passwort) {
+  return "Hallo " + name + "! 👋\n" +
+    "Du hast jetzt Zugang zu unserem Familienkalender 📅\n\n" +
+    "1. Nur wenn du NICHT bei uns im WLAN bist: zuerst die App „WireGuard“ einschalten " +
+    "(einmalig einrichten mit der Datei, die ich dir schicke).\n" +
+    "2. Diesen Link öffnen: " + location.origin + "\n" +
+    "3. Anmelden mit\n   Benutzername: " + benutzername + "\n   Startpasswort: " + passwort + "\n" +
+    "4. Danach ein eigenes Passwort wählen.\n" +
+    "5. Tipp: Im Browser-Menü ⋮ „Zum Startbildschirm hinzufügen“ – dann ist der Kalender wie eine App da.";
+}
+
+function zeigeZugang(b) {
+  const t = zugangsText(b.display_name.split(" ")[0], b.username, b.startpasswort);
+  $("#zugang-titel").textContent = "Zugangsdaten für " + b.display_name;
+  $("#zugang-text").textContent = t;
+  $("#zugang-whatsapp").href = "https://wa.me/?text=" + encodeURIComponent(t);
+  $("#zugang").classList.remove("versteckt");
+  $("#zugang").scrollIntoView({ block: "start" });
+}
+$("#zugang-zu").addEventListener("click", () => {
+  $("#zugang").classList.add("versteckt");
+  $("#zugang-text").textContent = "";
+});
+$("#zugang-kopieren").addEventListener("click", async () => {
+  const t = $("#zugang-text").textContent;
+  try { await navigator.clipboard.writeText(t); $("#zugang-kopieren").textContent = "Kopiert ✓"; }
+  catch (e) { // ohne https darf der Browser manchmal nicht kopieren: Text markieren
+    const bereich = document.createRange(); bereich.selectNodeContents($("#zugang-text"));
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(bereich);
+    $("#zugang-kopieren").textContent = "Markiert – jetzt lange drücken & kopieren";
+  }
+  setTimeout(() => { $("#zugang-kopieren").textContent = "Kopieren"; }, 4000);
+});
+
+formM.addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  $("#mitglied-fehler").textContent = "";
+  try {
+    const b = await api("POST", "/api/admin/benutzer", {
+      display_name: formM.display_name.value, username: formM.username.value, admin: formM.admin.checked,
+    });
+    formM.reset();
+    delete formM.username.dataset.selbst;
+    await zeigeBenutzer();
+    await ladeDaten();
+    zeigeZugang(b);
+  } catch (e) { $("#mitglied-fehler").textContent = e.message; }
+});
 
 $("#import-datei").addEventListener("change", async (ev) => {
   const datei = ev.target.files[0];
@@ -490,12 +572,26 @@ $("#abmelden").addEventListener("click", async () => {
   await start();
 });
 
+// Neue Programmversion auf dem Pi? Dann Seite neu laden (nur wenn gerade nichts eingegeben wird)
+let version = null;
+async function versionPruefen() {
+  try {
+    const s = await api("GET", "/api/status");
+    const offen = [...document.querySelectorAll("dialog")].some((d) => d.open);
+    if (version && s.version !== version && !offen) { location.reload(); return true; }
+    version = version || s.version;
+  } catch (e) { /* Pi gerade nicht erreichbar */ }
+  return false;
+}
+versionPruefen();
+
 // Alle 60 Sekunden neu laden, damit Änderungen der anderen ankommen
-setInterval(() => {
-  if (zustand.ich && document.visibilityState === "visible" && !$("#dlg-termin").open) ladeDaten().catch(() => {});
-}, 60000);
-document.addEventListener("visibilitychange", () => {
-  if (zustand.ich && document.visibilityState === "visible") ladeDaten().catch(() => {});
-});
+async function auffrischen() {
+  if (document.visibilityState !== "visible") return;
+  if (await versionPruefen()) return;
+  if (zustand.ich && !$("#dlg-termin").open) ladeDaten().catch(() => {});
+}
+setInterval(auffrischen, 60000);
+document.addEventListener("visibilitychange", auffrischen);
 
 start();

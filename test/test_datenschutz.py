@@ -22,6 +22,9 @@ MUSTER = {
     "Geraete-Kennung (MAC)": re.compile(r"\b(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\b", re.I),
 }
 
+# Offiziell reservierte Beispiel-Adressen (gehoeren niemandem) sind erlaubt
+ERLAUBT = re.compile(r"@example\.(?:invalid|com|org)$")
+
 
 def dateien():
     aus = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard"],
@@ -44,6 +47,8 @@ class Datenschutz(unittest.TestCase):
             for nr, zeile in enumerate(zeilen, 1):
                 for name, muster in MUSTER.items():
                     for treffer in muster.findall(zeile):
+                        if ERLAUBT.search(treffer):
+                            continue
                         funde.append("%s:%d: %s gefunden: %s" % (f, nr, name, treffer))
         self.assertEqual(funde, [], "\n" + "\n".join(funde))
 

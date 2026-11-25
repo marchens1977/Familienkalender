@@ -123,6 +123,45 @@ async function warteAufServer() {
     assert.strictEqual(inhalt.termine.length, 2);
     await a.click("#einst-zu");
 
+    // 8b. Verwalter legt ein Familienmitglied direkt an -> Zugangsdaten + WhatsApp-Knopf
+    await a.click("#menue");
+    await a.fill("#form-mitglied [name=display_name]", "Kim Müller");
+    assert.strictEqual(await a.inputValue("#form-mitglied [name=username]"), "kimmueller");
+    await a.click("#form-mitglied button[type=submit]");
+    await a.waitForSelector("#zugang:not(.versteckt)");
+    const zugang = await a.textContent("#zugang-text");
+    assert.match(zugang, /Benutzername: kimmueller/);
+    assert.ok(zugang.includes(URL.replace(/\/$/, "")), "Link fehlt im Text");
+    const startpw = zugang.match(/Startpasswort: (\S+)/)[1];
+    assert.match(await a.getAttribute("#zugang-whatsapp", "href"), /^https:\/\/wa\.me\/\?text=Hallo%20Kim/);
+    if (fotos) await a.screenshot({ path: path.join(fotos, "5-zugang.png") });
+    await a.waitForSelector("#benutzer-liste li:has-text('Kim Müller') .status.active");
+    await a.click("#zugang-zu");
+    await a.click("#einst-zu");
+
+    // 8c. Kim meldet sich mit Startpasswort an und muss eigenes Passwort wählen
+    const ctxC = await browser.newContext(Object.assign({}, handy, { locale: "de-DE" }));
+    const k = await ctxC.newPage();
+    k.on("pageerror", (e) => fehler.push(e.message));
+    await k.goto(URL);
+    await k.fill("#form-login [name=username]", "kimmueller");
+    await k.fill("#form-login [name=password]", startpw);
+    await k.click("#form-login button[type=submit]");
+    await k.waitForSelector("#dlg-erstpasswort[open]");
+    await k.keyboard.press("Escape"); // darf nicht wegdrückbar sein
+    assert.ok(await k.locator("#dlg-erstpasswort[open]").count() === 1);
+    await k.fill("#form-erstpasswort [name=pw1]", "kims-eigenes-pw");
+    await k.fill("#form-erstpasswort [name=pw2]", "kims-eigenes-pw");
+    if (fotos) await k.screenshot({ path: path.join(fotos, "6-erstes-passwort.png") });
+    await k.click("#form-erstpasswort button[type=submit]");
+    await k.waitForSelector("#dlg-erstpasswort:not([open])", { state: "attached" });
+    await k.waitForSelector("#tag-liste li:has-text('Klasse 3')");
+    // nach Neuladen kein Passwort-Dialog mehr
+    await k.reload();
+    await k.waitForSelector("#ansicht-kalender:not(.versteckt)");
+    await k.waitForTimeout(300);
+    assert.strictEqual(await k.locator("#dlg-erstpasswort[open]").count(), 0);
+
     // 9. Löschen
     await a.click("#tag-liste li:has-text('Klasse 3')");
     await a.click("#termin-loeschen");

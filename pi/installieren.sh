@@ -48,6 +48,34 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now familienkalender
 sudo systemctl restart familienkalender
 
+echo "Richte automatische Updates ein (stuendlich) ..."
+sudo tee /etc/systemd/system/familienkalender-update.service > /dev/null <<DIENST
+[Unit]
+Description=Familienkalender automatisch aktualisieren
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=FK_PORT=$PORT
+ExecStart=/bin/bash $ORDNER/pi/auto_aktualisieren.sh
+DIENST
+sudo tee /etc/systemd/system/familienkalender-update.timer > /dev/null <<DIENST
+[Unit]
+Description=Familienkalender stuendlich auf Updates pruefen
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+DIENST
+sudo systemctl daemon-reload
+sudo systemctl enable --now familienkalender-update.timer
+
 if command -v ufw > /dev/null; then
   sudo ufw allow from "$HEIMNETZ" to any port "$PORT" proto tcp comment 'Familienkalender'
 else
@@ -60,6 +88,7 @@ if systemctl is-active --quiet familienkalender; then
   echo "FERTIG ✅  Familienkalender laeuft."
   echo "Am Handy oeffnen:  http://$ADRESSE:$PORT"
   echo "WICHTIG: Leg JETZT sofort dein eigenes Profil an - das erste Profil wird Verwalter."
+  echo "Automatische Updates: stuendlich ✅ (naechste Pruefung: siehe 'systemctl list-timers familienkalender-update')"
 else
   echo "❌ Dienst laeuft nicht. Bitte diese Ausgabe an Claude schicken:"
   sudo journalctl -u familienkalender -n 30 --no-pager

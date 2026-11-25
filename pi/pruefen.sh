@@ -5,3 +5,5 @@ systemctl is-active familienkalender && echo "Dienst laeuft ✅" || echo "Dienst
 curl -s -o /dev/null -w "Webseite antwortet: %{http_code}\n" "http://127.0.0.1:${FK_PORT:-8502}/api/status"
 echo "Letzte Sicherungen:"; ls -1t "$HOME/familienkalender-daten/sicherungen" 2>/dev/null | head -3
 journalctl -u familienkalender -n 5 --no-pager 2>/dev/null
+echo "Automatische Updates:"; systemctl list-timers familienkalender-update.timer --no-pager 2>/dev/null | head -2
+journalctl -u familienkalender-update -n 5 --no-pager 2>/dev/null
