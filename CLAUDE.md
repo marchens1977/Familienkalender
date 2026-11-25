@@ -114,7 +114,12 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - Erinnerungen/Benachrichtigungen aufs Handy (bräuchte https bzw. eigene Lösung)
 - Suche
 - Einladungs-Link mit Einmal-Code (noch weniger Tipparbeit als Benutzername + Startpasswort)
-- Eventuell https, falls gewünscht
+- **Geplant (Entscheidung 2026-11-25): installierbare Web-App** (eigenes Symbol, eigenes Fenster, keine Adresszeile/IP).
+  Braucht https. Weg: eigene Domain bei einem deutschen Anbieter + kostenloses Sammel-Zertifikat, das der Pi selbst erneuert.
+  Domain, Zertifikat und Router-Einstellung werden **im privaten Server-Projekt** eingerichtet (Details nur dort, nicht hier).
+  **Danach hier:** Server auf https umstellen (Zertifikat vom Pi lesen), Installier-Funktion (Service Worker, Manifest
+  mit PNG-Symbolen 192/512), Installationsskript anpassen, WhatsApp-Text mit neuem Link, Tests ergänzen.
+  Eine APK wurde bewusst verworfen (Warnungen bei der Installation, mehr Aufwand für die Familie).
 
 ## 8. Test-Liste für dich (am Handy abhaken)
 
@@ -148,3 +153,4 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 | 2026-11-25 | Verwalter legt Mitglieder mit Startpasswort an, WhatsApp-Text, Pflicht-Passwortwechsel; stündliches Auto-Update mit Rückfall; Handy lädt neue Version selbst. 19 Server-/Skript-Tests + Browser-Test grün |
 | 2026-11-25 | Update auf dem Pi eingespielt (4b6fc19), Auto-Update-Zeitplan aktiv ✅ (Nutzer-Foto) |
 | 2026-11-25 | Wochenansicht (Liste Mo–So) und Tagesansicht (Stundenplan) ergänzt, Ansicht wird gemerkt. Alle Tests grün |
+| 2026-11-25 | Entscheidung: installierbare Web-App über eigene Domain + https (statt APK). Einrichtung der Domain zuerst im privaten Server-Projekt, danach Umbau hier |
