@@ -7,6 +7,8 @@ Kein fremder Dienst, keine Cloud: Die Termine liegen nur auf dem Pi.
 - Neue Profile müssen vom **Verwalter freigegeben** werden. Erst dann kommt man rein.
 - Oder einfacher: Der **Verwalter legt Familienmitglieder selbst an** und schickt Link, Benutzername und
   Startpasswort mit einem Knopfdruck **per WhatsApp**. Beim ersten Anmelden wählt jeder sein eigenes Passwort.
+- **Als App installierbar:** Liegt auf dem Pi ein Zertifikat (eigene Domain), läuft der Kalender verschlüsselt (https)
+  und lässt sich mit „Installieren“ wie eine App aufs Handy legen – eigenes Symbol, keine Adresszeile.
 - **Automatische Updates:** Der Pi holt neue Versionen stündlich von selbst; die Handys laden sie automatisch.
 - Alle Freigegebenen sehen und pflegen denselben Kalender (Termine, ganztägig oder mit Uhrzeit,
   mehrtägig, Wiederholung wöchentlich/monatlich/jährlich, „Wer ist dabei?“).

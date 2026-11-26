@@ -51,6 +51,12 @@ Läuft auf dem Pi (installiert 2026-11-25). Neue Funktionen werden automatisch g
   Offene Kalender am Handy merken eine neue Version (`/api/status` → `version`) und laden sich selbst neu.
 - Export (alle Mitglieder) als JSON-Datei, Import (nur Verwalter, überspringt Doppelte, überschreibt nichts)
 - Tägliche Sicherung der Datenbank auf dem Pi: `~/familienkalender-daten/sicherungen/` (letzte 14)
+- **Installierbare Web-App mit https (seit 2026-11-26, auf dem Pi noch einzuschalten):** Liegt auf dem Pi ein Zertifikat
+  (vom privaten Server-Projekt in `~/zertifikate/`), läuft der Kalender verschlüsselt unter `https://kalender.<domain>`
+  (Standard-Port 443, Link ohne Zusatz). Die alte http-Adresse leitet weiter; offene alte Seiten wechseln selbst.
+  Manifest mit PNG-Symbolen (192, 512, maskable), Hintergrund-Helfer `sw.js` (speichert **keine** Termine, nur die
+  Seite „Keine Verbindung“ mit Gestaltung), oranger Hinweis „Als App installieren“ (✕ = 2 Wochen Ruhe).
+  WhatsApp-Text zeigt automatisch den neuen Link + Tipp „Installieren“.
 
 ## 4. Wichtige Entscheidungen
 
@@ -69,7 +75,13 @@ Läuft auf dem Pi (installiert 2026-11-25). Neue Funktionen werden automatisch g
 - Passwörter nur als scrypt-Hash gespeichert. Sitzung per Cookie (HttpOnly, SameSite=Strict, 90 Tage).
   Schreibzugriffe brauchen die Kopfzeile `X-Familienkalender: 1` (Schutz gegen fremde Webseiten).
   Max. 10 Fehlversuche pro 15 Minuten beim Anmelden.
-- Verbindung ist **http** (nicht https). Im eigenen WLAN (WPA-verschlüsselt) und im VPN (verschlüsselt) vertretbar.
+- **https über eigenes Zertifikat** (Entscheidung 2026-11-26, statt APK). Domain/Zertifikat kommen aus dem privaten
+  Server-Projekt; der Server liest den Domainnamen auf dem Pi aus `~/zertifikate/domain` → **steht nie in diesem Projekt**.
+  https wird nur aktiv, wenn `pi/installieren.sh` es eingerichtet hat (`FK_ZERTIFIKATE` gesetzt) – so kann das Auto-Update
+  nichts kaputt machen. Klappt https nicht (Zertifikat kaputt, Port belegt), läuft der Kalender automatisch mit http weiter.
+  Port 443 per `AmbientCapabilities=CAP_NET_BIND_SERVICE` (kein root), Firewall nur Heimnetz. Cookie dann mit `Secure`.
+  Erneuert das Server-Projekt das Zertifikat, startet es den Dienst `familienkalender` selbst neu.
+  Ohne Zertifikat: weiterhin http (im eigenen WLAN bzw. VPN verschlüsselt, aber nicht als App installierbar).
 - Alle freigegebenen Mitglieder dürfen alle Termine bearbeiten und löschen (Familie = Vertrauen).
 - Wiederholende Termine: Änderungen/Löschen gelten immer für die ganze Serie.
 - Repository ist **öffentlich** (nur Code). Der Pi lädt per `git clone` über https, kein Schlüssel nötig.
@@ -84,10 +96,13 @@ Läuft auf dem Pi (installiert 2026-11-25). Neue Funktionen werden automatisch g
 | `pi/installieren.sh` | Einmalige Einrichtung auf dem Pi (Dienst `familienkalender`, Firewall) |
 | `pi/aktualisieren.sh` | Neueste Version sofort von Hand holen + Neustart |
 | `pi/auto_aktualisieren.sh` | Stündliches Auto-Update (Zeitplan `familienkalender-update.timer`), mit Rückkehr zur alten Version bei Fehler |
-| `pi/pruefen.sh` | Läuft der Dienst? Letzte Sicherungen? |
+| `pi/pruefen.sh` | Läuft der Dienst? Letzte Sicherungen? Updates? Verschlüsselung (https) ok? |
+| `server/static/sw.js`, `offline.html`, `icon-*.png` | Installier-Funktion: Hintergrund-Helfer, Seite „Keine Verbindung“, App-Symbole |
+| `werkzeuge/symbole_erzeugen.js` | Erzeugt die PNG-Symbole aus `icon.svg` (`node werkzeuge/symbole_erzeugen.js server/static`) |
 | `test/` | Automatische Tests |
 
-Einstellungen über Umgebungsvariablen: `FK_PORT` (8502), `FK_DATEN` (~/familienkalender-daten), `FK_HOST` (0.0.0.0).
+Einstellungen über Umgebungsvariablen: `FK_PORT` (8502), `FK_DATEN` (~/familienkalender-daten), `FK_HOST` (0.0.0.0);
+für https (setzt `pi/installieren.sh`): `FK_ZERTIFIKATE`, `FK_HTTPS_PORT` (443), `FK_NAME` (kalender), `FK_HTTPS=0` = aus.
 
 ## 6. Tests
 
@@ -106,6 +121,12 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
   (registrieren, Termin anlegen, Geburtstag jährlich, Freigabe, zweite Person bearbeitet, Export,
   Verwalter legt Mitglied an + WhatsApp-Text, Anmeldung mit Startpasswort + eigenes Passwort, Löschen,
   Wochenansicht (7 Tage, Blättern), Tagesansicht (Block-Position/-Höhe, Tippen auf Stunde, Ansicht gemerkt)).
+- `test/test_https.py`: https mit selbst erzeugtem Test-Zertifikat (erfundene Domain `beispiel.test`, Kette wird geprüft):
+  nur mit `FK_ZERTIFIKATE`, Cookie `Secure`, unverschlüsselte Anfrage stört nicht, Weiterleitung der alten Adresse
+  (Seiten, API, Status), Rückfall auf http bei kaputtem Zertifikat, Installier-Dateien.
+- `test/https_oberflaeche_test.js` (Chromium): Weiterleitung, Anmeldung, **Chrome-Prüfung „installierbar“ ohne Fehler**,
+  WhatsApp-Text mit neuem Link, Installier-Hinweis, Seite „Keine Verbindung“ mit Gestaltung.
+  Hinweis: In der Cloud-Testumgebung kann der Browser keine erfundenen Namen umleiten → Test läuft mit 127.0.0.1.
 - Pi-Skripte: nur Tippfehler-Prüfung (`bash -n`), echter Test auf dem Pi durch den Nutzer.
 
 ## 7. Offene Punkte / Ideen
@@ -114,12 +135,10 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - Erinnerungen/Benachrichtigungen aufs Handy (bräuchte https bzw. eigene Lösung)
 - Suche
 - Einladungs-Link mit Einmal-Code (noch weniger Tipparbeit als Benutzername + Startpasswort)
-- **Geplant (Entscheidung 2026-11-25): installierbare Web-App** (eigenes Symbol, eigenes Fenster, keine Adresszeile/IP).
-  Braucht https. Weg: eigene Domain bei einem deutschen Anbieter + kostenloses Sammel-Zertifikat, das der Pi selbst erneuert.
-  Domain, Zertifikat und Router-Einstellung werden **im privaten Server-Projekt** eingerichtet (Details nur dort, nicht hier).
-  **Danach hier:** Server auf https umstellen (Zertifikat vom Pi lesen), Installier-Funktion (Service Worker, Manifest
-  mit PNG-Symbolen 192/512), Installationsskript anpassen, WhatsApp-Text mit neuem Link, Tests ergänzen.
-  Eine APK wurde bewusst verworfen (Warnungen bei der Installation, mehr Aufwand für die Familie).
+- Familie außerhalb: prüfen, ob `kalender.<domain>` per VPN auflöst (WireGuard-Datei sollte die FritzBox als DNS nutzen)
+- Weitere Pi-Apps (z. B. Kicktipp) können dasselbe Sammel-Zertifikat nutzen; dann braucht es für Port 443 einen
+  gemeinsamen Verteiler (Reverse Proxy) – erst angehen, wenn es soweit ist
+- (Erledigt 2026-11-26: installierbare Web-App per https. Eine APK wurde bewusst verworfen.)
 
 ## 8. Test-Liste für dich (am Handy abhaken)
 
@@ -133,7 +152,14 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - [ ] Handy (zu Hause, VPN aus): die Adresse, die das Installationsskript am Ende anzeigt, öffnet die Anmeldeseite
 - [ ] Design: Kopfzeile Blau mit oranger Linie, „+“-Knopf und heutiger Tag Orange
 - [ ] Eigenes Profil angelegt → du bist Verwalter und siehst den Kalender
-- [ ] Chrome-Menü ⋮ → „Zum Startbildschirm hinzufügen“ → Symbol startet den Kalender
+- [ ] **https einschalten:** Befehl auf dem Pi (siehe Chat) → „Zertifikat gefunden ✅“, „Verschlüsselte Verbindung geprüft ✅“
+- [ ] Handy (zu Hause, VPN aus): `https://kalender.<domain>` öffnet den Kalender ohne Warnung (Schloss-Symbol)
+- [ ] Alte Adresse (http + Nummer) leitet automatisch auf die neue weiter
+- [ ] Oranger Hinweis „Installieren“ (oder ⋮ → „App installieren“) → Symbol auf dem Startbildschirm, App öffnet **ohne Adresszeile**
+- [ ] Nach Installation einmal neu anmelden nötig? (wegen neuer Adresse vermutlich ja – einmalig)
+- [ ] WLAN aus + VPN aus → App zeigt „Keine Verbindung“ mit Hinweis auf WireGuard
+- [ ] Mit VPN unterwegs: `https://kalender.<domain>` öffnet sich
+- [ ] `bash ~/familienkalender/pi/pruefen.sh` zeigt „Verschlüsselt (https) ✅“
 - [ ] Termin anlegen, ändern, löschen klappt; Datum wird deutsch angezeigt
 - [ ] Geburtstag mit „jedes Jahr“ erscheint auch im nächsten Jahr
 - [ ] Zweites Profil (z. B. auf einem anderen Handy) anlegen → „wartet auf Freigabe“ → du gibst frei → Anmeldung klappt
@@ -154,3 +180,4 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 | 2026-11-25 | Update auf dem Pi eingespielt (4b6fc19), Auto-Update-Zeitplan aktiv ✅ (Nutzer-Foto) |
 | 2026-11-25 | Wochenansicht (Liste Mo–So) und Tagesansicht (Stundenplan) ergänzt, Ansicht wird gemerkt. Alle Tests grün |
 | 2026-11-25 | Entscheidung: installierbare Web-App über eigene Domain + https (statt APK). Einrichtung der Domain zuerst im privaten Server-Projekt, danach Umbau hier |
+| 2026-11-26 | Server-Projekt meldet: Sammel-Zertifikat auf dem Pi fertig. Hier umgebaut: https mit Zertifikat vom Pi (Port 443, Link ohne Zusatz), Weiterleitung der alten Adresse, Rückfall auf http, Installier-Funktion (Manifest, PNG-Symbole, Service Worker, Seite „Keine Verbindung“, Hinweis „Installieren“), Installations-/Prüfskript erweitert. Beim Testen gefunden: Test-Browser der Cloud kann erfundene Namen nicht umleiten (Umgebung, nicht Kalender). 25 Server-/Skript-Tests + 2 Browser-Tests grün. Auf dem Pi noch nicht eingeschaltet |

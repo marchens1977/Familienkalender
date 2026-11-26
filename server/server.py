@@ -10,6 +10,15 @@ Einstellungen ueber Umgebungsvariablen:
   FK_PORT  (Standard 8502)
   FK_DATEN (Standard ~/familienkalender-daten)
   FK_HOST  (Standard 0.0.0.0)
+
+Verschluesselte Verbindung (https), nur wenn auf dem Pi ein Zertifikat liegt:
+  FK_ZERTIFIKATE (setzt pi/installieren.sh, z. B. ~/zertifikate): Ordner mit Datei "domain" (Domainname)
+                 und Unterordner <domain>/ mit fullchain.pem + privkey.pem (legt das Server-Projekt an)
+  FK_NAME        (Standard kalender): Unter-Name -> https://kalender.<domain>
+  FK_HTTPS_PORT  (Standard 443)
+  FK_HTTPS=0     schaltet https ab
+Mit https leitet FK_PORT (http) nur noch auf die neue Adresse weiter.
+Der Domainname steht bewusst nirgends im Code, er wird auf dem Pi gelesen.
 """
 
 import datetime as dt
@@ -19,7 +28,9 @@ import json
 import os
 import re
 import secrets
+import socket
 import sqlite3
+import ssl
 import threading
 import time
 from http import cookies
@@ -42,6 +53,11 @@ STATIC_DATEIEN = {
     "/style.css": ("style.css", "text/css; charset=utf-8"),
     "/icon.svg": ("icon.svg", "image/svg+xml"),
     "/manifest.json": ("manifest.json", "application/manifest+json"),
+    "/sw.js": ("sw.js", "application/javascript; charset=utf-8"),
+    "/offline.html": ("offline.html", "text/html; charset=utf-8"),
+    "/icon-192.png": ("icon-192.png", "image/png"),
+    "/icon-512.png": ("icon-512.png", "image/png"),
+    "/icon-maskable-512.png": ("icon-maskable-512.png", "image/png"),
 }
 
 DATUM = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -390,6 +406,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def cookie_setzen(self, token, loeschen=False):
         wert = "%s=%s; Path=/; HttpOnly; SameSite=Strict" % (COOKIE, "" if loeschen else token)
+        if getattr(self.server, "https", False):
+            wert += "; Secure"
         wert += "; Max-Age=%d" % (0 if loeschen else SESSION_TAGE * 86400)
         return ("Set-Cookie", wert)
 
@@ -435,6 +453,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.antwort(*a)
         except Fehler as f:
             self.antwort(f.status, {"fehler": f.text})
+        except (BrokenPipeError, ConnectionResetError, ssl.SSLError):
+            return  # Handy hat die Verbindung abgebrochen - kein Fehler
         except Exception as e:  # pragma: no cover - Notfall
             self.log_error("Fehler: %r", e)
             self.antwort(500, {"fehler": "Interner Fehler."})
@@ -444,7 +464,8 @@ class Handler(BaseHTTPRequestHandler):
             raise Fehler(404, "Nicht gefunden.")
         datei, typ = STATIC_DATEIEN[pfad]
         with open(os.path.join(STATIC, datei), "rb") as f:
-            self.antwort(200, roh=f.read(), typ=typ)
+            extra = [("Service-Worker-Allowed", "/")] if datei == "sw.js" else None
+            self.antwort(200, roh=f.read(), typ=typ, extra=extra)
 
     # -- API
     def api(self, m, pfad, db):
@@ -669,10 +690,96 @@ class Handler(BaseHTTPRequestHandler):
 class Server(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, adresse, datenordner):
+    def __init__(self, adresse, datenordner, ssl_kontext=None):
         self.datenbank = Datenbank(datenordner)
         self.bremse = Bremse()
         super().__init__(adresse, Handler)
+        self.https = ssl_kontext is not None
+        if self.https:
+            # Verschluesselung erst im Verbindungs-Thread aushandeln, damit ein langsames Geraet niemanden blockiert
+            self.socket = ssl_kontext.wrap_socket(self.socket, server_side=True, do_handshake_on_connect=False)
+
+    def handle_error(self, request, client_address):
+        # Abgebrochene oder unverschluesselte Verbindungen auf dem https-Anschluss sind kein Grund fuer Fehlermeldungen
+        import sys
+        fehler = sys.exc_info()[1]
+        if isinstance(fehler, (ssl.SSLError, ConnectionError, socket.timeout)):
+            return
+        super().handle_error(request, client_address)
+
+
+# ---------------------------------------------------------------- https
+
+def https_einstellungen():
+    """Liest das Zertifikat vom Pi. Gibt (Adresse, Zertifikat, Schluessel) zurueck oder None (dann nur http)."""
+    # Nur wenn das Installationsskript https eingerichtet hat (dann ist FK_ZERTIFIKATE gesetzt)
+    if os.environ.get("FK_HTTPS", "1") == "0" or not os.environ.get("FK_ZERTIFIKATE"):
+        return None
+    ordner = os.path.expanduser(os.environ["FK_ZERTIFIKATE"])
+    try:
+        with open(os.path.join(ordner, "domain"), encoding="utf-8") as f:
+            domain = f.read().strip().lower()
+    except OSError:
+        return None
+    if not re.match(r"^[a-z0-9.-]+$", domain) or "." not in domain or ".." in domain:
+        print("Zertifikat: Datei 'domain' ist ungueltig, bleibe bei http.", flush=True)
+        return None
+    kette = os.path.join(ordner, domain, "fullchain.pem")
+    schluessel = os.path.join(ordner, domain, "privkey.pem")
+    if not (os.path.isfile(kette) and os.path.isfile(schluessel)):
+        print("Zertifikat: Dateien fehlen, bleibe bei http.", flush=True)
+        return None
+    name = os.environ.get("FK_NAME", "kalender").strip().lower()
+    return ("%s.%s" % (name, domain) if name else domain), kette, schluessel
+
+
+def ssl_kontext_bauen(kette, schluessel):
+    kontext = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    kontext.minimum_version = ssl.TLSVersion.TLSv1_2
+    kontext.load_cert_chain(kette, schluessel)
+    return kontext
+
+
+class UmleitungsHandler(BaseHTTPRequestHandler):
+    """Alte http-Adresse: schickt alle zur neuen https-Adresse."""
+    server_version = "Familienkalender"
+    sys_version = ""
+
+    def log_message(self, fmt, *args):
+        if not os.environ.get("FK_LEISE"):
+            super().log_message(fmt, *args)
+
+    def senden(self, status, daten=None, ziel=None):
+        body = json.dumps(daten or {}, ensure_ascii=False).encode()
+        self.send_response(status)
+        if ziel:
+            self.send_header("Location", ziel)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def verarbeiten(self):
+        pfad = urlparse(self.path).path
+        ziel = self.server.neue_adresse
+        if pfad == "/api/status":
+            # noch offene alte Seiten fragen hier nach Updates -> sie wechseln selbst zur neuen Adresse
+            return self.senden(200, {"umzug": ziel, "version": VERSION})
+        if pfad.startswith("/api/"):
+            return self.senden(409, {"fehler": "Der Kalender ist umgezogen.", "umzug": ziel})
+        return self.senden(302, {"umzug": ziel}, ziel=ziel + (pfad if pfad in STATIC_DATEIEN else "/"))
+
+    do_GET = do_HEAD = do_POST = do_PUT = do_DELETE = verarbeiten
+
+
+class UmleitungsServer(ThreadingHTTPServer):
+    daemon_threads = True
+
+    def __init__(self, adresse, neue_adresse):
+        self.neue_adresse = neue_adresse.rstrip("/")
+        super().__init__(adresse, UmleitungsHandler)
 
 
 def sicherungs_schleife(datenbank):
@@ -688,9 +795,27 @@ def main():
     port = int(os.environ.get("FK_PORT", "8502"))
     host = os.environ.get("FK_HOST", "0.0.0.0")
     daten = os.path.expanduser(os.environ.get("FK_DATEN", "~/familienkalender-daten"))
-    server = Server((host, port), daten)
+    https = https_einstellungen()
+    server = None
+    if https:
+        name, kette, schluessel = https
+        https_port = int(os.environ.get("FK_HTTPS_PORT", "443"))
+        try:
+            server = Server((host, https_port), daten, ssl_kontext_bauen(kette, schluessel))
+        except (OSError, ssl.SSLError) as e:
+            # z. B. Zertifikat kaputt oder Port nicht erlaubt: lieber unverschluesselt weiterlaufen als gar nicht
+            print("https geht nicht (%s) - laufe weiter mit http." % e, flush=True)
+            https = None
+    if https:
+        adresse = "https://%s%s" % (name, "" if https_port == 443 else ":%d" % https_port)
+        umleitung = UmleitungsServer((host, port), adresse)
+        threading.Thread(target=umleitung.serve_forever, daemon=True).start()
+        print("Familienkalender laeuft verschluesselt (https) auf Port %d, alter Port %d leitet weiter. Daten in %s"
+              % (https_port, port, daten), flush=True)
+    else:
+        server = Server((host, port), daten)
+        print("Familienkalender laeuft auf Port %d (http), Daten in %s" % (port, daten), flush=True)
     threading.Thread(target=sicherungs_schleife, args=(server.datenbank,), daemon=True).start()
-    print("Familienkalender laeuft auf Port %d, Daten in %s" % (port, daten), flush=True)
     server.serve_forever()
 
 

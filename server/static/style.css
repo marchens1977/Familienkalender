@@ -145,3 +145,11 @@ dialog { border-top: 6px solid var(--orange); }
 .block small { color: var(--grau); }
 .jetzt { position: absolute; left: 3.4em; right: 0; height: 0; border-top: 2px solid var(--orange); z-index: 1; pointer-events: none; }
 .jetzt::before { content: ""; position: absolute; left: -5px; top: -6px; width: 10px; height: 10px; border-radius: 50%; background: var(--orange); }
+
+/* Seite "Keine Verbindung" und Installier-Hinweis */
+.haupt-link { display: block; text-align: center; background: var(--blau); color: #fff; border-color: var(--blau); margin-top: 1em; }
+.installieren { display: flex; align-items: center; gap: .6em; background: #fff1e9; border-bottom: 1px solid #ffb48f;
+  padding: .5em .8em; font-size: .92em; }
+.installieren span { flex: 1; }
+.installieren button { padding: .4em .8em; }
+.installieren .haupt { background: var(--orange); border-color: var(--orange); }

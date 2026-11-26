@@ -5,6 +5,8 @@
 #  1. Programm = dieser Ordner, Daten in ~/familienkalender-daten (nie auf GitHub)
 #  2. Dienst "familienkalender" startet automatisch beim Hochfahren
 #  3. Firewall: Port nur aus dem eigenen Heimnetz erlaubt (wird hier auf dem Pi automatisch erkannt)
+#  4. Liegt ein Zertifikat in ~/zertifikate (vom Server-Projekt), laeuft der Kalender verschluesselt (https)
+#     unter https://kalender.<domain> und ist als App installierbar. Die alte Adresse leitet dann weiter.
 # Bewusst stehen KEINE Adressen oder Netzdaten im Skript - alles wird auf dem Pi ermittelt.
 set -e
 ORDNER="$(cd "$(dirname "$0")/.." && pwd)"
@@ -24,6 +26,36 @@ HEIMNETZ="${FK_NETZ:-$(python3 -c "import ipaddress,sys; print(ipaddress.ip_inte
 ADRESSE="${ADRESSE_MIT_MASKE%/*}"
 echo "Erkannt: Heimnetz $HEIMNETZ, Adresse dieses Pi $ADRESSE"
 
+# Zertifikat vorhanden? (Domainname steht nur auf dem Pi, nie im Projekt)
+ZERT="${FK_ZERTIFIKATE:-$HOME/zertifikate}"
+HTTPS_PORT="${FK_HTTPS_PORT:-443}"
+NAME="${FK_NAME:-kalender}"
+HTTPS=0
+if [ -f "$ZERT/domain" ]; then
+  DOMAIN="$(tr -d '[:space:]' < "$ZERT/domain")"
+  if [ -f "$ZERT/$DOMAIN/fullchain.pem" ] && [ -f "$ZERT/$DOMAIN/privkey.pem" ]; then
+    EIGENE_PID="$(systemctl show -p MainPID --value familienkalender 2>/dev/null || echo 0)"
+    if sudo ss -ltnpH "sport = :$HTTPS_PORT" | grep -v "pid=$EIGENE_PID," | grep -q .; then
+      echo "⚠️  Port $HTTPS_PORT ist schon von einem anderen Programm belegt - Kalender bleibt bei http. Bitte Claude fragen."
+    else
+      HTTPS=1
+      echo "Zertifikat gefunden ✅ - Kalender wird verschluesselt (https) eingerichtet."
+    fi
+  else
+    echo "Hinweis: Zertifikat-Dateien fehlen - Kalender bleibt bei http."
+  fi
+else
+  echo "Kein Zertifikat gefunden - Kalender laeuft mit http (geht auch, nur nicht als App installierbar)."
+fi
+if [ "$HTTPS" = 1 ]; then
+  HTTPS_ZEILEN="Environment=FK_ZERTIFIKATE=$ZERT
+Environment=FK_HTTPS_PORT=$HTTPS_PORT
+Environment=FK_NAME=$NAME
+AmbientCapabilities=CAP_NET_BIND_SERVICE"
+else
+  HTTPS_ZEILEN="Environment=FK_HTTPS=0"
+fi
+
 echo "Richte Dienst ein (fragt evtl. nach deinem Passwort) ..."
 sudo tee /etc/systemd/system/familienkalender.service > /dev/null <<DIENST
 [Unit]
@@ -36,6 +68,7 @@ User=$USER
 WorkingDirectory=$ORDNER/server
 Environment=FK_PORT=$PORT
 Environment=FK_DATEN=$DATEN
+$HTTPS_ZEILEN
 ExecStart=/usr/bin/python3 $ORDNER/server/server.py
 Restart=always
 RestartSec=5
@@ -78,6 +111,9 @@ sudo systemctl enable --now familienkalender-update.timer
 
 if command -v ufw > /dev/null; then
   sudo ufw allow from "$HEIMNETZ" to any port "$PORT" proto tcp comment 'Familienkalender'
+  if [ "$HTTPS" = 1 ]; then
+    sudo ufw allow from "$HEIMNETZ" to any port "$HTTPS_PORT" proto tcp comment 'Familienkalender https'
+  fi
 else
   echo "Hinweis: Keine Firewall (ufw) gefunden. Bitte Claude fragen."
 fi
@@ -86,8 +122,20 @@ sleep 2
 if systemctl is-active --quiet familienkalender; then
   echo ""
   echo "FERTIG ✅  Familienkalender laeuft."
-  echo "Am Handy oeffnen:  http://$ADRESSE:$PORT"
-  echo "WICHTIG: Leg JETZT sofort dein eigenes Profil an - das erste Profil wird Verwalter."
+  if [ "$HTTPS" = 1 ]; then
+    LINK="https://$NAME.$DOMAIN"
+    [ "$HTTPS_PORT" != 443 ] && LINK="$LINK:$HTTPS_PORT"
+    echo "Am Handy oeffnen:  $LINK   (verschluesselt, als App installierbar)"
+    echo "Die alte Adresse http://$ADRESSE:$PORT leitet automatisch dorthin weiter."
+    if curl -s -o /dev/null --max-time 5 --resolve "$NAME.$DOMAIN:$HTTPS_PORT:127.0.0.1" "https://$NAME.$DOMAIN:$HTTPS_PORT/api/status"; then
+      echo "Verschluesselte Verbindung geprueft ✅"
+    else
+      echo "⚠️  Verschluesselte Verbindung antwortet noch nicht - bitte diese Ausgabe an Claude schicken."
+    fi
+  else
+    echo "Am Handy oeffnen:  http://$ADRESSE:$PORT"
+  fi
+  echo "Falls noch niemand angemeldet ist: sofort eigenes Profil anlegen - das erste Profil wird Verwalter."
   echo "Automatische Updates: stuendlich ✅ (naechste Pruefung: siehe 'systemctl list-timers familienkalender-update')"
 else
   echo "❌ Dienst laeuft nicht. Bitte diese Ausgabe an Claude schicken:"

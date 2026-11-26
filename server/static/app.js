@@ -31,6 +31,7 @@ async function api(methode, pfad, daten) {
   }
   let inhalt = {};
   try { inhalt = await r.json(); } catch (e) { /* leer */ }
+  if (inhalt.umzug) { location.href = inhalt.umzug; } // Kalender hat eine neue (verschlüsselte) Adresse
   if (!r.ok) throw Object.assign(new Error(inhalt.fehler || "Fehler " + r.status), { status: r.status });
   return inhalt;
 }
@@ -656,7 +657,8 @@ function zugangsText(name, benutzername, passwort) {
     "2. Diesen Link öffnen: " + location.origin + "\n" +
     "3. Anmelden mit\n   Benutzername: " + benutzername + "\n   Startpasswort: " + passwort + "\n" +
     "4. Danach ein eigenes Passwort wählen.\n" +
-    "5. Tipp: Im Browser-Menü ⋮ „Zum Startbildschirm hinzufügen“ – dann ist der Kalender wie eine App da.";
+    "5. Tipp: Oben im Kalender auf „Installieren“ tippen (oder im Browser-Menü ⋮ „App installieren“) – " +
+    "dann ist der Kalender wie eine App auf deinem Handy.";
 }
 
 function zeigeZugang(b) {
@@ -723,6 +725,7 @@ let version = null;
 async function versionPruefen() {
   try {
     const s = await api("GET", "/api/status");
+    if (s.umzug) { location.href = s.umzug; return true; }
     const offen = [...document.querySelectorAll("dialog")].some((d) => d.open);
     if (version && s.version !== version && !offen) { location.reload(); return true; }
     version = version || s.version;
@@ -741,3 +744,28 @@ setInterval(auffrischen, 60000);
 document.addEventListener("visibilitychange", auffrischen);
 
 start();
+
+// ------------------------------------------------------------ Als App installieren
+// Der Hintergrund-Helfer (sw.js) macht die Seite installierbar. Geht nur mit verschlüsselter Verbindung (https).
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => { /* ohne https nicht möglich – Kalender geht trotzdem */ });
+}
+let installierAngebot = null;
+window.addEventListener("beforeinstallprompt", (ev) => {
+  ev.preventDefault(); // eigenen, freundlicheren Hinweis zeigen
+  installierAngebot = ev;
+  const bis = Number(localStorage.getItem("fk_installieren_spaeter") || 0);
+  if (Date.now() > bis) $("#installieren").classList.remove("versteckt");
+});
+$("#installieren-ja").addEventListener("click", async () => {
+  $("#installieren").classList.add("versteckt");
+  if (!installierAngebot) return;
+  installierAngebot.prompt();
+  await installierAngebot.userChoice.catch(() => {});
+  installierAngebot = null;
+});
+$("#installieren-nein").addEventListener("click", () => {
+  $("#installieren").classList.add("versteckt");
+  localStorage.setItem("fk_installieren_spaeter", String(Date.now() + 14 * 864e5)); // 2 Wochen Ruhe
+});
+window.addEventListener("appinstalled", () => $("#installieren").classList.add("versteckt"));
