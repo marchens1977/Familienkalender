@@ -513,6 +513,8 @@ function oeffneTermin(e, uhrzeit) {
     info = "Zuletzt geändert" + (wer ? " von " + wer.display_name : "") + " am " +
       new Date(e.updated_at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
     if (e.repeat !== "none") info += ". Achtung: Änderungen gelten für alle Wiederholungen.";
+    if (e.abo_name) info += ". Kommt automatisch aus dem Kalender-Link „" + e.abo_name +
+      "“ – Änderungen hier werden beim nächsten Abruf überschrieben.";
   }
   $("#termin-info").textContent = info;
   zeitFelderAnpassen();
@@ -568,7 +570,11 @@ $("#menue").addEventListener("click", async () => {
   const admin = zustand.ich.role === "admin";
   $("#verwaltung").classList.toggle("versteckt", !admin);
   $("#import-knopf").classList.toggle("versteckt", !admin);
-  if (admin) await zeigeBenutzer();
+  $("#import-ics-knopf").classList.toggle("versteckt", !admin);
+  $("#abos-bereich").classList.toggle("versteckt", !admin);
+  $("#import-ics-meldung").textContent = "";
+  $("#abo-meldung").textContent = "";
+  if (admin) { await zeigeBenutzer(); await zeigeAbos(); }
   $("#dlg-einstellungen").showModal();
 });
 $("#einst-zu").addEventListener("click", () => $("#dlg-einstellungen").close());
@@ -711,6 +717,107 @@ $("#import-datei").addEventListener("change", async (ev) => {
   } catch (e) {
     $("#import-meldung").textContent = e instanceof SyntaxError ? "Die Datei ist keine gültige Sicherung." : e.message;
   }
+});
+
+// ------------------------------------------------------------ Andere Kalender (.ics) und Kalender-Links
+function icsMeldung(r) {
+  const teile = [r.neu + (r.gespeichert ? " Termine importiert" : " neue Termine gefunden")];
+  if (r.uebersprungen) teile.push(r.uebersprungen + " schon vorhanden (übersprungen)");
+  if (r.vereinfacht) teile.push(r.vereinfacht + " mit besonderer Wiederholung (z. B. täglich) nur einmal eingetragen");
+  if (r.abgesagt) teile.push(r.abgesagt + " abgesagte weggelassen");
+  if (r.einzeln) teile.push(r.einzeln + " geänderte Einzeltermine einer Serie weggelassen");
+  if (r.fehlerhaft) teile.push(r.fehlerhaft + " fehlerhafte übersprungen");
+  return teile.join(", ") + ".";
+}
+
+$("#import-ics-datei").addEventListener("change", async (ev) => {
+  const datei = ev.target.files[0];
+  ev.target.value = "";
+  if (!datei) return;
+  const meldung = $("#import-ics-meldung");
+  meldung.textContent = "Datei wird gelesen …";
+  try {
+    const ics = await datei.text();
+    const pruefung = await api("POST", "/api/import-ics", { ics, nur_pruefen: true });
+    if (!pruefung.neu) { meldung.textContent = "Keine neuen Termine. " + icsMeldung(pruefung); return; }
+    if (!confirm(icsMeldung(pruefung) + "\n\nJetzt " + pruefung.neu + " Termine in den Familienkalender übernehmen?")) {
+      meldung.textContent = "Nichts importiert.";
+      return;
+    }
+    meldung.textContent = icsMeldung(await api("POST", "/api/import-ics", { ics }));
+    await ladeDaten();
+  } catch (e) { meldung.textContent = e.message; }
+});
+
+function abosTeilnehmer() {
+  const box = $("#abo-teilnehmer");
+  box.replaceChildren();
+  for (const p of zustand.mitglieder) {
+    const l = document.createElement("label");
+    const c = document.createElement("input");
+    c.type = "checkbox"; c.value = p.id;
+    const punkt = document.createElement("i");
+    punkt.style.cssText = "width:.8em;height:.8em;border-radius:50%;display:inline-block;background:" + p.color;
+    l.append(c, punkt, document.createTextNode(p.display_name));
+    box.append(l);
+  }
+}
+
+async function zeigeAbos() {
+  abosTeilnehmer();
+  const liste = await api("GET", "/api/abos");
+  const ul = $("#abo-liste");
+  ul.replaceChildren();
+  for (const a of liste) {
+    const li = document.createElement("li");
+    li.className = "benutzer abo";
+    const p = person(a.participants[0]);
+    if (p) li.style.borderLeftColor = p.color;
+    const t = document.createElement("div"); t.className = "t"; t.textContent = a.name;
+    const u = document.createElement("div"); u.className = "u";
+    u.textContent = a.anzahl + " Termine" + (a.last_ok ? " · zuletzt geholt " +
+      new Date(a.last_ok).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "");
+    const st = document.createElement("div");
+    st.className = "u abo-status" + (a.last_status.startsWith("OK") ? "" : " fehler");
+    st.textContent = a.last_status.startsWith("OK") ? "Letzter Abruf: " + a.last_status.slice(4) : a.last_status;
+    const ak = document.createElement("div"); ak.className = "aktionen";
+    const abrufen = document.createElement("button"); abrufen.type = "button"; abrufen.textContent = "Jetzt abrufen";
+    abrufen.addEventListener("click", async () => {
+      abrufen.disabled = true; abrufen.textContent = "Wird abgerufen …";
+      try { await api("POST", "/api/abos/" + a.id + "/abrufen"); await zeigeAbos(); await ladeDaten(); }
+      catch (e) { alert(e.message); abrufen.disabled = false; abrufen.textContent = "Jetzt abrufen"; }
+    });
+    const weg = document.createElement("button"); weg.type = "button"; weg.className = "gefahr"; weg.textContent = "Löschen";
+    weg.addEventListener("click", async () => {
+      if (!confirm("Kalender-Link „" + a.name + "“ und seine " + a.anzahl + " Termine aus dem Familienkalender löschen?")) return;
+      try { await api("DELETE", "/api/abos/" + a.id); await zeigeAbos(); await ladeDaten(); } catch (e) { alert(e.message); }
+    });
+    ak.append(abrufen, weg);
+    li.append(t, u, st, ak);
+    ul.append(li);
+  }
+}
+
+const formA = $("#form-abo");
+formA.addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const meldung = $("#abo-meldung");
+  const knopf = formA.querySelector("button[type=submit]");
+  meldung.textContent = "Link wird abgerufen …";
+  knopf.disabled = true;
+  try {
+    const a = await api("POST", "/api/abos", {
+      name: formA.name.value, url: formA.url.value,
+      participants: [...$("#abo-teilnehmer").querySelectorAll("input:checked")].map((c) => Number(c.value)),
+    });
+    formA.reset();
+    meldung.textContent = a.last_status.startsWith("OK")
+      ? "Gespeichert ✓ " + a.anzahl + " Termine eingetragen. Ab jetzt holt der Pi Änderungen selbst."
+      : "Gespeichert, aber: " + a.last_status + " Bitte den Link prüfen.";
+    await zeigeAbos();
+    await ladeDaten();
+  } catch (e) { meldung.textContent = e.message; }
+  knopf.disabled = false;
 });
 
 $("#abmelden").addEventListener("click", async () => {

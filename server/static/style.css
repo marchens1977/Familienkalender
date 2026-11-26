@@ -76,7 +76,7 @@ dialog h4 { margin: 1.2em 0 .2em; }
 .zwei > label.zeit { flex: .7; }
 fieldset { border: 1px solid var(--rand); border-radius: 8px; margin: .6em 0; }
 legend { font-size: .92em; color: var(--grau); }
-#teilnehmer label { display: inline-flex; align-items: center; gap: .3em; margin: .2em .8em .2em 0; color: var(--text); }
+#teilnehmer label, #abo-teilnehmer label { display: inline-flex; align-items: center; gap: .3em; margin: .2em .8em .2em 0; color: var(--text); }
 .knoepfe { display: flex; gap: .5em; align-items: center; flex-wrap: wrap; margin-top: .6em; }
 .luecke { flex: 1; }
 .abstand { margin-top: 1.5em; }
@@ -159,3 +159,4 @@ dialog { border-top: 6px solid var(--orange); }
   padding: .55em .8em; font-size: .92em; position: sticky; top: 0; z-index: 3; }
 .verbindung span { flex: 1; }
 .verbindung button { background: #fff; color: var(--orange); border-color: #fff; padding: .35em .8em; font-weight: 600; }
+.abo .abo-status.fehler { color: var(--rot); }

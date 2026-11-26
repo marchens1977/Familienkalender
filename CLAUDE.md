@@ -54,6 +54,16 @@ Läuft auf dem Pi (installiert 2026-11-25). Neue Funktionen werden automatisch g
 - **Automatische Updates:** Pi prüft stündlich GitHub (`main`). Startet die neue Version nicht, holt er die alte zurück.
   Offene Kalender am Handy merken eine neue Version (`/api/status` → `version`) und laden sich selbst neu.
 - Export (alle Mitglieder) als JSON-Datei, Import (nur Verwalter, überspringt Doppelte, überschreibt nichts)
+- **Andere Kalender (.ics, seit 2026-11-26):** Einstellungen → „Andere Kalender“. Export „Als .ics exportieren“ (alle),
+  Import einer .ics-Datei (nur Verwalter): erst Vorschau („X neue Termine gefunden … übernehmen?“), Doppelte (gleiche
+  UID oder gleicher Titel+Datum+Uhrzeit) werden übersprungen. Wiederholung jede Woche/Monat/Jahr wird übernommen,
+  andere Regeln (täglich, alle 2 Wochen …) nur als einzelner Termin. Abgesagte und geänderte Einzeltermine einer Serie
+  werden weggelassen. Zeiten werden in deutsche Zeit umgerechnet (Sommer-/Winterzeit).
+- **Kalender-Links / Abos (seit 2026-11-26, nur Verwalter):** Name + Link (https:// oder webcal://) + „Wer ist dabei“.
+  Der Pi holt den Link sofort und dann **alle 6 Stunden** (`abo_schleife`), trägt neue Termine ein, aktualisiert
+  geänderte (z. B. verlegte Anstoßzeit) und entfernt **künftige** Termine, die nicht mehr im Link stehen (vergangene bleiben).
+  Klappt ein Abruf nicht, bleiben die Termine unverändert und der Fehler steht in der Liste. „Jetzt abrufen“ und
+  „Löschen“ (löscht den Link mit seinen Terminen, mit Rückfrage). Im Termin steht „Kommt automatisch aus dem Kalender-Link …“.
 - Tägliche Sicherung der Datenbank auf dem Pi: `~/familienkalender-daten/sicherungen/` (letzte 14)
 - **Installierbare Web-App mit https (seit 2026-11-26, auf dem Pi aktiv):** Liegt auf dem Pi ein Zertifikat
   (vom privaten Server-Projekt in `~/zertifikate/`), läuft der Kalender verschlüsselt unter `https://kalender.<domain>`
@@ -90,6 +100,12 @@ Läuft auf dem Pi (installiert 2026-11-25). Neue Funktionen werden automatisch g
   Ohne Zertifikat: weiterhin http (im eigenen WLAN bzw. VPN verschlüsselt, aber nicht als App installierbar).
 - Alle freigegebenen Mitglieder dürfen alle Termine bearbeiten und löschen (Familie = Vertrauen).
 - Wiederholende Termine: Änderungen/Löschen gelten immer für die ganze Serie.
+- **.ics-Format** (Entscheidung 2026-11-26): eigener Leser/Schreiber `server/ics.py` (nur Standardbibliothek, kein pip).
+  Kalender-Links werden vom Pi aus abgerufen (ausgehend, Firewall unverändert); die Links (z. B. geheime Google-Adresse)
+  liegen nur in der Datenbank auf dem Pi, nie im Repository. Termine aus Links gehören dem Link: Änderungen in der App
+  überschreibt der nächste Abruf. Kalender-Links verwalten und .ics importieren: nur Verwalter (wie JSON-Import).
+- Klender (bisherige Familien-App): ob sie .ics exportieren kann, ist unbekannt (Nutzer prüft). Umweg falls nicht:
+  Klender mit Google Kalender verbinden und von dort exportieren bzw. Google-Adresse im iCal-Format als Link eintragen.
 - Repository ist **öffentlich** (nur Code). Der Pi lädt per `git clone` über https, kein Schlüssel nötig.
   Die Skripte arbeiten im Ordner, in dem sie liegen (keine festen Pfade oder Adressen).
 
@@ -105,6 +121,7 @@ Läuft auf dem Pi (installiert 2026-11-25). Neue Funktionen werden automatisch g
 | `pi/pruefen.sh` | Läuft der Dienst? Letzte Sicherungen? Updates? Verschlüsselung (https) ok? |
 | `server/static/sw.js`, `offline.html`, `icon-*.png` | Installier-Funktion: Hintergrund-Helfer, Seite „Keine Verbindung“, App-Symbole |
 | `werkzeuge/symbole_erzeugen.js` | Erzeugt die PNG-Symbole aus `icon.svg` (`node werkzeuge/symbole_erzeugen.js server/static`) |
+| `server/ics.py` | Kalender-Dateien (.ics) lesen und schreiben (Import, Export, Kalender-Links) |
 | `test/` | Automatische Tests |
 
 Einstellungen über Umgebungsvariablen: `FK_PORT` (8502), `FK_DATEN` (~/familienkalender-daten), `FK_HOST` (0.0.0.0);
@@ -133,11 +150,19 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - `test/https_oberflaeche_test.js` (Chromium): Weiterleitung, Anmeldung, **Chrome-Prüfung „installierbar“ ohne Fehler**,
   WhatsApp-Text mit neuem Link, Installier-Hinweis, Seite „Keine Verbindung“ mit Gestaltung.
   Hinweis: In der Cloud-Testumgebung kann der Browser keine erfundenen Namen umleiten → Test läuft mit 127.0.0.1.
+- `test/test_ics.py` (10 Tests): .ics lesen (ganztägig, UTC/Sommerzeit, Zeitzone, Dauer, umbrochene Zeilen,
+  Wiederholungen, abgesagt, Einzeltermin einer Serie, kaputt, Umlaute/Windows-Zeichen), schreiben + wieder lesen,
+  Import (Vorschau, Rechte, nichts doppelt), Export, Kalender-Link mit Test-Server auf 127.0.0.1 (neu, geändert,
+  entfernt, Link nicht erreichbar, falscher Inhalt, webcal://, Löschen), Ergänzung alter Datenbanken.
+- `test/ics_oberflaeche_test.js` (Chromium): .ics-Datei importieren (Rückfrage, Ergebnis, zweites Mal nichts doppelt),
+  Kalender-Link anlegen + „Jetzt abrufen“, Export als .ics, Termine in „Demnächst“, Hinweis im Termin, Link löschen.
 - Pi-Skripte: nur Tippfehler-Prüfung (`bash -n`), echter Test auf dem Pi durch den Nutzer.
 
 ## 7. Offene Punkte / Ideen
 
 - Einzelnen Termin aus einer Serie löschen/verschieben (geht noch nicht)
+- .ics: tägliche Wiederholungen / „alle 2 Wochen“ kann der Kalender noch nicht (werden einmal eingetragen)
+- Klender: Export-Möglichkeit klären (siehe Entscheidungen)
 - Erinnerungen/Benachrichtigungen aufs Handy (bräuchte https bzw. eigene Lösung)
 - Suche
 - Einladungs-Link mit Einmal-Code (noch weniger Tipparbeit als Benutzername + Startpasswort)
@@ -168,6 +193,12 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - [ ] Mit VPN unterwegs: `https://kalender.<domain>` öffnet sich
 - [ ] `bash ~/familienkalender/pi/pruefen.sh` zeigt „Verschlüsselt (https) ✅“
 - [ ] Termin anlegen, ändern, löschen klappt; Datum wird deutsch angezeigt
+- [ ] (.ics) ☰ → „Andere Kalender“ → „Als .ics exportieren“ lädt eine Datei herunter
+- [ ] (.ics) Klender: gibt es dort „Exportieren“/„Teilen“ als .ics? (Ergebnis Claude sagen)
+- [ ] (.ics) Google-Kalender-Datei importiert → Rückfrage mit Anzahl → Termine sind da, Uhrzeiten stimmen
+- [ ] (.ics) Dieselbe Datei nochmal → „Keine neuen Termine“
+- [ ] (Link) Mainz-05-Spielplan-Link eingetragen → „Gespeichert ✓ … Termine eingetragen“, Anstoßzeiten stimmen
+- [ ] (Link) Nach einem Tag: in der Liste steht ein neues „zuletzt geholt“
 - [ ] Geburtstag mit „jedes Jahr“ erscheint auch im nächsten Jahr
 - [ ] Zweites Profil (z. B. auf einem anderen Handy) anlegen → „wartet auf Freigabe“ → du gibst frei → Anmeldung klappt
 - [ ] Beide sehen die Termine des anderen (spätestens nach 1 Minute)
@@ -191,3 +222,4 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 | 2026-11-26 | Auf dem Pi eingeschaltet (Foto): Zertifikat gefunden ✅, verschlüsselte Verbindung geprüft ✅. **Fehler:** Skript fand per `ssh pi '…'` die Firewall nicht (`/usr/sbin` fehlt im Suchpfad) → https-Freigabe fehlte. Behoben (Suchpfad ergänzt, Freigaben werden am Ende angezeigt). **Regel:** Pi-Skripte müssen auch über `ssh pi '…'` laufen |
 | 2026-11-26 | WhatsApp-Text: WireGuard „richten wir einmal gemeinsam ein“ (statt Datei schicken). Neuer Hinweis „Keine Verbindung – WireGuard einschalten“ in der offenen App. Tests grün |
 | 2026-11-26 | Nach erneutem Lauf: Firewall-Freigabe 443 eingetragen („Rule added“, 443 + 8502 nur Heimnetz). Am Handy lädt `https://kalender.<domain>` ✅, Hinweis „Installieren“ erscheint ✅. Installieren selbst + App ohne Adresszeile: Rückmeldung offen |
+| 2026-11-26 | Andere Kalender: .ics-Import (mit Vorschau) und -Export, Kalender-Links (Abos, z. B. Spielplan) holt der Pi alle 6 Stunden. Neue Tests `test_ics.py` + `ics_oberflaeche_test.js`, alle Tests grün. Direkt auf `main` (Entscheidung Nutzer) |

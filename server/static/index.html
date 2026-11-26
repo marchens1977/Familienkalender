@@ -168,6 +168,30 @@
     </div>
     <p id="import-meldung" class="klein"></p>
 
+    <h4>Andere Kalender (Google, Klender …)</h4>
+    <p class="klein">Im Standardformat <b>.ics</b>, das fast alle Kalender-Apps können. Beim Import werden doppelte
+      Termine übersprungen, es wird nichts überschrieben.</p>
+    <div class="knoepfe">
+      <a id="export-ics" class="knopf" href="/api/export.ics" download>Als .ics exportieren</a>
+      <label id="import-ics-knopf" class="knopf versteckt">.ics importieren<input id="import-ics-datei" type="file" accept=".ics,text/calendar" hidden></label>
+    </div>
+    <p id="import-ics-meldung" class="klein"></p>
+
+    <div id="abos-bereich" class="versteckt">
+      <h4>Kalender-Links (automatisch)</h4>
+      <p class="klein">Link zu einem Kalender eintragen, z. B. den Spielplan eines Vereins oder die „Privatadresse im
+        iCal-Format“ eines Google Kalenders. Der Pi holt die Termine dann <b>alle 6 Stunden</b> selbst und trägt
+        Änderungen ein. Termine aus einem Link bitte nicht hier ändern – das überschreibt der nächste Abruf.</p>
+      <ul id="abo-liste" class="liste"></ul>
+      <form id="form-abo">
+        <label>Name (z. B. Mainz 05) <input name="name" maxlength="60" required></label>
+        <label>Link (beginnt mit https:// oder webcal://) <input name="url" inputmode="url" autocomplete="off" required></label>
+        <fieldset><legend>Wer ist dabei? (bestimmt die Farbe)</legend><div id="abo-teilnehmer"></div></fieldset>
+        <button type="submit" class="haupt">Hinzufügen und abrufen</button>
+        <p id="abo-meldung" class="klein"></p>
+      </form>
+    </div>
+
     <div class="knoepfe abstand"><button id="abmelden">Abmelden</button></div>
   </div>
 </dialog>

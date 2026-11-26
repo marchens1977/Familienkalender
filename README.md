@@ -14,6 +14,8 @@ Kein fremder Dienst, keine Cloud: Die Termine liegen nur auf dem Pi.
   mehrtägig, Wiederholung wöchentlich/monatlich/jährlich, „Wer ist dabei?“).
 - Erreichbar nur im **Heimnetz** oder unterwegs über ein **VPN** ins Heimnetz.
 - **Export/Import** der Termine als Datei, dazu tägliche automatische Sicherung auf dem Pi (14 Tage).
+- **Andere Kalender:** Import und Export im Standardformat **.ics** (z. B. Google Kalender) und **Kalender-Links**
+  (z. B. Spielplan eines Vereins), die der Pi alle 6 Stunden selbst abruft.
 
 > Diese App läuft **nicht auf GitHub Pages**, sondern auf dem Raspberry Pi (sie braucht eine Datenbank).
 > Auf GitHub liegt nur das Programm – **keine Familiendaten**.

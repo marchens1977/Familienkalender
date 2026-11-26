@@ -33,9 +33,12 @@ import sqlite3
 import ssl
 import threading
 import time
+import urllib.request
 from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
+
+import ics
 
 HIER = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(HIER, "static")
@@ -45,6 +48,9 @@ SICHERUNGEN_BEHALTEN = 14
 FARBEN = ["#FF5910", "#002D72", "#2ecc71", "#9b59b6", "#f39c12", "#1abc9c", "#e91e63", "#795548"]
 WIEDERHOLUNG = ("none", "weekly", "monthly", "yearly")
 COOKIE = "fk_sitzung"
+ABO_STUNDEN = 6            # Kalender-Links (z. B. Spielplan) alle 6 Stunden neu abrufen
+ABO_MAX_BYTES = 20 * 1024 * 1024
+ABO_MAX_TERMINE = 3000
 
 STATIC_DATEIEN = {
     "/": ("index.html", "text/html; charset=utf-8"),
@@ -119,6 +125,29 @@ class Datenbank:
             spalten = [z[1] for z in db.execute("PRAGMA table_info(users)")]
             if "must_change_pw" not in spalten:
                 db.execute("ALTER TABLE users ADD COLUMN must_change_pw INTEGER NOT NULL DEFAULT 0")
+            spalten = [z[1] for z in db.execute("PRAGMA table_info(events)")]
+            if "uid" not in spalten:  # Kennung aus fremden Kalendern (.ics), gegen doppelte Termine
+                db.execute("ALTER TABLE events ADD COLUMN uid TEXT")
+            if "abo_id" not in spalten:  # Termin kommt automatisch aus einem Kalender-Link
+                db.execute("ALTER TABLE events ADD COLUMN abo_id INTEGER")
+            db.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS abos (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    participants TEXT NOT NULL DEFAULT '[]',
+                    created_by INTEGER,
+                    created_at TEXT NOT NULL,
+                    last_try REAL,
+                    last_ok TEXT,
+                    last_status TEXT NOT NULL DEFAULT '',
+                    anzahl INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE INDEX IF NOT EXISTS events_uid ON events(uid);
+                CREATE INDEX IF NOT EXISTS events_abo ON events(abo_id);
+                """
+            )
 
     def verbindung(self):
         db = sqlite3.connect(self.pfad, timeout=10)
@@ -284,7 +313,153 @@ def termin_json(r):
         "location": r["location"], "notes": r["notes"], "repeat": r["repeat"],
         "repeat_until": r["repeat_until"], "participants": json.loads(r["participants"]),
         "created_by": r["created_by"], "updated_by": r["updated_by"], "updated_at": r["updated_at"],
+        "abo_id": r["abo_id"], "abo_name": r["abo_name"] if "abo_name" in r.keys() else None,
     }
+
+
+def abo_json(r):
+    return {"id": r["id"], "name": r["name"], "url": r["url"], "participants": json.loads(r["participants"]),
+            "last_ok": r["last_ok"], "last_status": r["last_status"], "anzahl": r["anzahl"]}
+
+
+def abo_link(wert):
+    url = (wert or "").strip() if isinstance(wert, str) else ""
+    if url.lower().startswith("webcal://"):
+        url = "https://" + url[9:]
+    teile = urlparse(url)
+    if teile.scheme not in ("http", "https") or not teile.netloc or len(url) > 1000:
+        raise Fehler(400, "Bitte einen Link angeben, der mit https:// (oder webcal://) beginnt.")
+    return url
+
+
+def abo_laden(url):
+    """Holt die Kalender-Datei hinter einem Link (Standard: aus dem Internet)."""
+    anfrage = urllib.request.Request(url, headers={"User-Agent": "Familienkalender", "Accept": "text/calendar, */*"})
+    with urllib.request.urlopen(anfrage, timeout=30) as r:
+        roh = r.read(ABO_MAX_BYTES + 1)
+    if len(roh) > ABO_MAX_BYTES:
+        raise ValueError("Die Kalender-Datei ist zu groß.")
+    return ics.text_aus_bytes(roh)
+
+
+TERMIN_SPALTEN = "SELECT e.*, a.name AS abo_name FROM events e LEFT JOIN abos a ON a.id=e.abo_id"
+
+
+def abo_abrufen(datenbank, abo_id, laden=None):
+    """Holt einen Kalender-Link und gleicht dessen Termine ab:
+    neue eintragen, geaenderte aktualisieren, verschwundene kuenftige Termine entfernen.
+    Das Herunterladen passiert ohne Datenbank-Sperre, damit der Kalender solange benutzbar bleibt."""
+    laden = laden or abo_laden
+    with datenbank.lock:
+        db = datenbank.verbindung()
+        try:
+            abo = db.execute("SELECT * FROM abos WHERE id=?", (abo_id,)).fetchone()
+        finally:
+            db.close()
+    if abo is None:
+        return None
+    fehler = None
+    try:
+        termine, hinweise = ics.lesen(laden(abo["url"]))
+        if not termine:
+            fehler = "Der Link enthält keine Termine."
+        elif len(termine) > ABO_MAX_TERMINE:
+            fehler = "Der Link enthält zu viele Termine (%d)." % len(termine)
+    except ValueError as e:
+        fehler = str(e)
+    except Exception as e:  # Netzwerk, falsche Adresse, Server antwortet nicht ...
+        fehler = "Abruf fehlgeschlagen (%s)." % (getattr(e, "reason", None) or getattr(e, "code", None)
+                                                  or e.__class__.__name__)
+    with datenbank.lock:
+        db = datenbank.verbindung()
+        try:
+            with db:
+                if fehler:
+                    # Bei Fehlern bleiben die bisherigen Termine unveraendert stehen
+                    db.execute("UPDATE abos SET last_try=?, last_status=? WHERE id=?", (time.time(), fehler, abo_id))
+                else:
+                    ids = {r[0] for r in db.execute("SELECT id FROM users WHERE status='active'")}
+                    teilnehmer = [i for i in json.loads(abo["participants"]) if i in ids]
+                    vorhanden = {r["uid"]: r["id"] for r in
+                                 db.execute("SELECT id, uid FROM events WHERE abo_id=?", (abo_id,))}
+                    gesehen = set()
+                    neu = geaendert = kaputt = 0
+                    for t in termine:
+                        schluessel = t["uid"] or "~%s|%s|%s" % (t["title"], t["start_date"], t["start_time"] or "")
+                        if schluessel in gesehen:
+                            continue
+                        gesehen.add(schluessel)
+                        try:
+                            daten = termin_aus_daten(dict(t, participants=teilnehmer), ids)
+                        except Fehler:
+                            kaputt += 1
+                            continue
+                        daten.update(uid=schluessel, abo_id=abo_id)
+                        if schluessel in vorhanden:
+                            alt = db.execute("SELECT * FROM events WHERE id=?", (vorhanden[schluessel],)).fetchone()
+                            if any(str(alt[k]) != str(daten[k]) for k in TERMIN_FELDER):
+                                termin_schreiben(db, daten, abo["created_by"], vorhanden[schluessel])
+                                geaendert += 1
+                        else:
+                            termin_schreiben(db, daten, abo["created_by"])
+                            neu += 1
+                    # Termine, die im Link nicht mehr vorkommen (abgesagt/verlegt): nur kuenftige entfernen
+                    weg = 0
+                    heute = dt.date.today().isoformat()
+                    for schluessel, tid in vorhanden.items():
+                        if schluessel not in gesehen:
+                            weg += db.execute(
+                                "DELETE FROM events WHERE id=? AND (end_date>=? OR (repeat<>'none' AND "
+                                "IFNULL(repeat_until,'9999')>=?))", (tid, heute, heute)).rowcount
+                    anzahl = db.execute("SELECT COUNT(*) FROM events WHERE abo_id=?", (abo_id,)).fetchone()[0]
+                    status = "OK: %d neu, %d geändert, %d entfernt" % (neu, geaendert, weg)
+                    if hinweise["vereinfacht"]:
+                        status += ", %d mit besonderer Wiederholung nur einmal eingetragen" % hinweise["vereinfacht"]
+                    if kaputt + hinweise["fehlerhaft"]:
+                        status += ", %d fehlerhaft übersprungen" % (kaputt + hinweise["fehlerhaft"])
+                    db.execute("UPDATE abos SET last_try=?, last_ok=?, last_status=?, anzahl=? WHERE id=?",
+                               (time.time(), jetzt_text(), status, anzahl, abo_id))
+            return abo_json(db.execute("SELECT * FROM abos WHERE id=?", (abo_id,)).fetchone())
+        finally:
+            db.close()
+
+
+def abo_schleife(datenbank):
+    """Ruft alle Kalender-Links regelmaessig ab (alle ABO_STUNDEN Stunden)."""
+    time.sleep(60)
+    while True:
+        try:
+            with datenbank.lock:
+                db = datenbank.verbindung()
+                try:
+                    faellig = [r[0] for r in db.execute(
+                        "SELECT id FROM abos WHERE IFNULL(last_try,0) < ?", (time.time() - ABO_STUNDEN * 3600,))]
+                finally:
+                    db.close()
+            for abo_id in faellig:
+                abo_abrufen(datenbank, abo_id)
+        except Exception as e:  # pragma: no cover
+            print("Kalender-Links abrufen fehlgeschlagen:", e.__class__.__name__, flush=True)
+        time.sleep(600)
+
+
+TERMIN_FELDER = ["title", "start_date", "end_date", "all_day", "start_time", "end_time",
+                 "location", "notes", "repeat", "repeat_until", "participants"]
+
+
+def termin_schreiben(db, t, benutzer_id, termin_id=None):
+    felder = TERMIN_FELDER + [f for f in ("uid", "abo_id") if f in t]
+    werte = [t[f] for f in felder]
+    if termin_id is None:
+        cur = db.execute(
+            "INSERT INTO events(%s, created_by, updated_by, updated_at) VALUES(%s)"
+            % (",".join(felder), ",".join("?" * (len(felder) + 3))),
+            werte + [benutzer_id, benutzer_id, jetzt_text()])
+        return cur.lastrowid
+    db.execute("UPDATE events SET %s, updated_by=?, updated_at=? WHERE id=?"
+               % ",".join("%s=?" % f for f in felder),
+               werte + [benutzer_id, jetzt_text(), termin_id])
+    return termin_id
 
 
 def benutzer_json(r, mit_details=False):
@@ -438,6 +613,7 @@ class Handler(BaseHTTPRequestHandler):
             if methode != "GET" and self.headers.get("X-Familienkalender") != "1":
                 raise Fehler(403, "Anfrage abgelehnt.")
             self.puffer = []
+            self.danach = None
             try:
                 with self.db.lock:
                     db = self.db.verbindung()
@@ -449,6 +625,10 @@ class Handler(BaseHTTPRequestHandler):
                 gemerkt = self.puffer
             finally:
                 self.puffer = None
+            if self.danach:
+                # z. B. Kalender-Link abrufen: erst nach dem Speichern und ohne Datenbank-Sperre (dauert evtl. etwas)
+                status, daten = self.danach()
+                gemerkt = [(status, daten)]
             for a in gemerkt:
                 self.antwort(*a)
         except Fehler as f:
@@ -584,6 +764,52 @@ class Handler(BaseHTTPRequestHandler):
                 neu += 1
             return self.antwort(200, {"neu": neu, "uebersprungen": doppelt})
 
+        if teile == ["export.ics"] and m == "GET":
+            rows = db.execute("SELECT * FROM events ORDER BY start_date, start_time").fetchall()
+            roh = ics.schreiben([dict(r) for r in rows]).encode()
+            name = "familienkalender-%s.ics" % dt.date.today().isoformat()
+            return self.antwort(200, roh=roh, typ="text/calendar; charset=utf-8",
+                                extra=[("Content-Disposition", 'attachment; filename="%s"' % name)])
+
+        if teile == ["import-ics"] and m == "POST":
+            # Termine aus einem anderen Kalender (.ics-Datei, z. B. Google Kalender)
+            if u["role"] != "admin":
+                raise Fehler(403, "Nur fuer Verwalter.")
+            d = self.json_lesen(maximal=ABO_MAX_BYTES * 2)
+            if not isinstance(d, dict) or not isinstance(d.get("ics"), str):
+                raise Fehler(400, "Keine Kalender-Datei erhalten.")
+            try:
+                liste, hinweise = ics.lesen(d["ics"])
+            except ValueError as e:
+                raise Fehler(400, str(e))
+            ids = {r[0] for r in db.execute("SELECT id FROM users WHERE status='active'")}
+            neu = doppelt = 0
+            kaputt = hinweise["fehlerhaft"]
+            for e in liste:
+                try:
+                    t = termin_aus_daten(dict(e, participants=[]), ids)
+                except Fehler:
+                    kaputt += 1
+                    continue
+                t["uid"] = e["uid"]
+                gibt_es = (e["uid"] and db.execute("SELECT 1 FROM events WHERE uid=?", (e["uid"],)).fetchone()) or \
+                    db.execute("SELECT 1 FROM events WHERE title=? AND start_date=? AND IFNULL(start_time,'')=IFNULL(?,'')",
+                               (t["title"], t["start_date"], t["start_time"])).fetchone()
+                if gibt_es:
+                    doppelt += 1
+                    continue
+                if not d.get("nur_pruefen"):
+                    self.termin_speichern(db, t, u["id"])
+                neu += 1
+            return self.antwort(200, {"neu": neu, "uebersprungen": doppelt, "fehlerhaft": kaputt,
+                                      "vereinfacht": hinweise["vereinfacht"], "abgesagt": hinweise["abgesagt"],
+                                      "einzeln": hinweise["einzeln"], "gespeichert": not d.get("nur_pruefen")})
+
+        if teile and teile[0] == "abos":
+            if u["role"] != "admin":
+                raise Fehler(403, "Nur fuer Verwalter.")
+            return self.abos(m, teile, db, u)
+
         if teile and teile[0] == "admin":
             if u["role"] != "admin":
                 raise Fehler(403, "Nur fuer Verwalter.")
@@ -592,30 +818,18 @@ class Handler(BaseHTTPRequestHandler):
         raise Fehler(404, "Unbekannte Anfrage.")
 
     def termin_speichern(self, db, t, benutzer_id, termin_id=None):
-        felder = ["title", "start_date", "end_date", "all_day", "start_time", "end_time",
-                  "location", "notes", "repeat", "repeat_until", "participants"]
-        werte = [t[f] for f in felder]
-        if termin_id is None:
-            cur = db.execute(
-                "INSERT INTO events(%s, created_by, updated_by, updated_at) VALUES(%s)"
-                % (",".join(felder), ",".join("?" * (len(felder) + 3))),
-                werte + [benutzer_id, benutzer_id, jetzt_text()])
-            return cur.lastrowid
-        db.execute("UPDATE events SET %s, updated_by=?, updated_at=? WHERE id=?"
-                   % ",".join("%s=?" % f for f in felder),
-                   werte + [benutzer_id, jetzt_text(), termin_id])
-        return termin_id
+        return termin_schreiben(db, t, benutzer_id, termin_id)
 
     def termine(self, m, teile, db, u):
         ids = {r[0] for r in db.execute("SELECT id FROM users WHERE status='active'")}
         if len(teile) == 1:
             if m == "GET":
-                rows = db.execute("SELECT * FROM events ORDER BY start_date, start_time").fetchall()
+                rows = db.execute(TERMIN_SPALTEN + " ORDER BY e.start_date, e.start_time").fetchall()
                 return self.antwort(200, [termin_json(r) for r in rows])
             if m == "POST":
                 t = termin_aus_daten(self.json_lesen(), ids)
                 neu = self.termin_speichern(db, t, u["id"])
-                r = db.execute("SELECT * FROM events WHERE id=?", (neu,)).fetchone()
+                r = db.execute(TERMIN_SPALTEN + " WHERE e.id=?", (neu,)).fetchone()
                 return self.antwort(201, termin_json(r))
         if len(teile) == 2 and teile[1].isdigit():
             tid = int(teile[1])
@@ -624,11 +838,46 @@ class Handler(BaseHTTPRequestHandler):
             if m == "PUT":
                 t = termin_aus_daten(self.json_lesen(), ids)
                 self.termin_speichern(db, t, u["id"], tid)
-                r = db.execute("SELECT * FROM events WHERE id=?", (tid,)).fetchone()
+                r = db.execute(TERMIN_SPALTEN + " WHERE e.id=?", (tid,)).fetchone()
                 return self.antwort(200, termin_json(r))
             if m == "DELETE":
                 db.execute("DELETE FROM events WHERE id=?", (tid,))
                 return self.antwort(200, {})
+        raise Fehler(404, "Unbekannte Anfrage.")
+
+    def abos(self, m, teile, db, u):
+        """Kalender-Links (Abos): der Pi holt die Termine regelmaessig selbst ab."""
+        if teile == ["abos"] and m == "GET":
+            return self.antwort(200, [abo_json(r) for r in db.execute("SELECT * FROM abos ORDER BY name")])
+        if teile == ["abos"] and m == "POST":
+            d = self.json_lesen()
+            name = text(d.get("name"), "Name", 60, pflicht=True)
+            url = abo_link(d.get("url"))
+            if db.execute("SELECT 1 FROM abos WHERE url=?", (url,)).fetchone():
+                raise Fehler(409, "Diesen Link gibt es schon.")
+            if db.execute("SELECT COUNT(*) FROM abos").fetchone()[0] >= 20:
+                raise Fehler(400, "Höchstens 20 Kalender-Links.")
+            ids = {r[0] for r in db.execute("SELECT id FROM users WHERE status='active'")}
+            teilnehmer = d.get("participants") or []
+            if not isinstance(teilnehmer, list):
+                raise Fehler(400, "Teilnehmer ungueltig.")
+            teilnehmer = sorted({x for x in teilnehmer if isinstance(x, int) and x in ids})
+            cur = db.execute("INSERT INTO abos(name, url, participants, created_by, created_at) VALUES(?,?,?,?,?)",
+                             (name, url, json.dumps(teilnehmer), u["id"], jetzt_text()))
+            abo_id = cur.lastrowid
+            self.danach = lambda: (201, abo_abrufen(self.db, abo_id, self.server.abo_laden))
+            return
+        if len(teile) >= 2 and teile[1].isdigit():
+            abo_id = int(teile[1])
+            if not db.execute("SELECT 1 FROM abos WHERE id=?", (abo_id,)).fetchone():
+                raise Fehler(404, "Kalender-Link nicht gefunden.")
+            if len(teile) == 2 and m == "DELETE":
+                weg = db.execute("DELETE FROM events WHERE abo_id=?", (abo_id,)).rowcount
+                db.execute("DELETE FROM abos WHERE id=?", (abo_id,))
+                return self.antwort(200, {"geloeschte_termine": weg})
+            if teile[2:] == ["abrufen"] and m == "POST":
+                self.danach = lambda: (200, abo_abrufen(self.db, abo_id, self.server.abo_laden))
+                return
         raise Fehler(404, "Unbekannte Anfrage.")
 
     def verwaltung(self, m, teile, db, u):
@@ -693,6 +942,7 @@ class Server(ThreadingHTTPServer):
     def __init__(self, adresse, datenordner, ssl_kontext=None):
         self.datenbank = Datenbank(datenordner)
         self.bremse = Bremse()
+        self.abo_laden = abo_laden  # in Tests ersetzbar
         super().__init__(adresse, Handler)
         self.https = ssl_kontext is not None
         if self.https:
@@ -816,6 +1066,7 @@ def main():
         server = Server((host, port), daten)
         print("Familienkalender laeuft auf Port %d (http), Daten in %s" % (port, daten), flush=True)
     threading.Thread(target=sicherungs_schleife, args=(server.datenbank,), daemon=True).start()
+    threading.Thread(target=abo_schleife, args=(server.datenbank,), daemon=True).start()
     server.serve_forever()
 
 
