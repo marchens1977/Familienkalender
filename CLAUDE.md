@@ -51,7 +51,7 @@ Läuft auf dem Pi (installiert 2026-11-25). Neue Funktionen werden automatisch g
   Offene Kalender am Handy merken eine neue Version (`/api/status` → `version`) und laden sich selbst neu.
 - Export (alle Mitglieder) als JSON-Datei, Import (nur Verwalter, überspringt Doppelte, überschreibt nichts)
 - Tägliche Sicherung der Datenbank auf dem Pi: `~/familienkalender-daten/sicherungen/` (letzte 14)
-- **Installierbare Web-App mit https (seit 2026-11-26, auf dem Pi noch einzuschalten):** Liegt auf dem Pi ein Zertifikat
+- **Installierbare Web-App mit https (seit 2026-11-26, auf dem Pi aktiv):** Liegt auf dem Pi ein Zertifikat
   (vom privaten Server-Projekt in `~/zertifikate/`), läuft der Kalender verschlüsselt unter `https://kalender.<domain>`
   (Standard-Port 443, Link ohne Zusatz). Die alte http-Adresse leitet weiter; offene alte Seiten wechseln selbst.
   Manifest mit PNG-Symbolen (192, 512, maskable), Hintergrund-Helfer `sw.js` (speichert **keine** Termine, nur die
@@ -152,8 +152,8 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - [ ] Handy (zu Hause, VPN aus): die Adresse, die das Installationsskript am Ende anzeigt, öffnet die Anmeldeseite
 - [ ] Design: Kopfzeile Blau mit oranger Linie, „+“-Knopf und heutiger Tag Orange
 - [ ] Eigenes Profil angelegt → du bist Verwalter und siehst den Kalender
-- [ ] **https einschalten:** Befehl auf dem Pi (siehe Chat) → „Zertifikat gefunden ✅“, „Verschlüsselte Verbindung geprüft ✅“
-- [ ] Handy (zu Hause, VPN aus): `https://kalender.<domain>` öffnet den Kalender ohne Warnung (Schloss-Symbol)
+- [x] (2026-11-26) **https einschalten:** Befehl auf dem Pi (siehe Chat) → „Zertifikat gefunden ✅“, „Verschlüsselte Verbindung geprüft ✅“
+- [x] (2026-11-26) Handy (zu Hause, VPN aus): `https://kalender.<domain>` öffnet den Kalender, Hinweis „Installieren“ erscheint (Foto)
 - [ ] Alte Adresse (http + Nummer) leitet automatisch auf die neue weiter
 - [ ] Oranger Hinweis „Installieren“ (oder ⋮ → „App installieren“) → Symbol auf dem Startbildschirm, App öffnet **ohne Adresszeile**
 - [ ] Nach Installation einmal neu anmelden nötig? (wegen neuer Adresse vermutlich ja – einmalig)
@@ -180,5 +180,6 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 | 2026-11-25 | Update auf dem Pi eingespielt (4b6fc19), Auto-Update-Zeitplan aktiv ✅ (Nutzer-Foto) |
 | 2026-11-25 | Wochenansicht (Liste Mo–So) und Tagesansicht (Stundenplan) ergänzt, Ansicht wird gemerkt. Alle Tests grün |
 | 2026-11-25 | Entscheidung: installierbare Web-App über eigene Domain + https (statt APK). Einrichtung der Domain zuerst im privaten Server-Projekt, danach Umbau hier |
-| 2026-11-26 | Server-Projekt meldet: Sammel-Zertifikat auf dem Pi fertig. Hier umgebaut: https mit Zertifikat vom Pi (Port 443, Link ohne Zusatz), Weiterleitung der alten Adresse, Rückfall auf http, Installier-Funktion (Manifest, PNG-Symbole, Service Worker, Seite „Keine Verbindung“, Hinweis „Installieren“), Installations-/Prüfskript erweitert. Beim Testen gefunden: Test-Browser der Cloud kann erfundene Namen nicht umleiten (Umgebung, nicht Kalender). 25 Server-/Skript-Tests + 2 Browser-Tests grün. Auf dem Pi noch nicht eingeschaltet |
+| 2026-11-26 | Server-Projekt meldet: Sammel-Zertifikat auf dem Pi fertig. Hier umgebaut: https mit Zertifikat vom Pi (Port 443, Link ohne Zusatz), Weiterleitung der alten Adresse, Rückfall auf http, Installier-Funktion (Manifest, PNG-Symbole, Service Worker, Seite „Keine Verbindung“, Hinweis „Installieren“), Installations-/Prüfskript erweitert. Beim Testen gefunden: Test-Browser der Cloud kann erfundene Namen nicht umleiten (Umgebung, nicht Kalender). 25 Server-/Skript-Tests + 2 Browser-Tests grün. Am selben Abend eingeschaltet (siehe nächste Zeilen) |
 | 2026-11-26 | Auf dem Pi eingeschaltet (Foto): Zertifikat gefunden ✅, verschlüsselte Verbindung geprüft ✅. **Fehler:** Skript fand per `ssh pi '…'` die Firewall nicht (`/usr/sbin` fehlt im Suchpfad) → https-Freigabe fehlte. Behoben (Suchpfad ergänzt, Freigaben werden am Ende angezeigt). **Regel:** Pi-Skripte müssen auch über `ssh pi '…'` laufen |
+| 2026-11-26 | Nach erneutem Lauf: Firewall-Freigabe 443 eingetragen („Rule added“, 443 + 8502 nur Heimnetz). Am Handy lädt `https://kalender.<domain>` ✅, Hinweis „Installieren“ erscheint ✅. Installieren selbst + App ohne Adresszeile: Rückmeldung offen |
