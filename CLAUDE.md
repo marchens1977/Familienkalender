@@ -116,6 +116,12 @@ Läuft auf dem Pi (installiert 2026-11-25). Neue Funktionen werden automatisch g
 - Klender (bisherige Familien-App): ob sie .ics exportieren kann, ist unbekannt (Nutzer prüft). Umweg falls nicht:
   Klender mit Google Kalender verbinden und von dort exportieren bzw. Google-Adresse im iCal-Format als Link eintragen.
 - Repository ist **öffentlich** (nur Code). Der Pi lädt per `git clone` über https, kein Schlüssel nötig.
+- **Öffentlich oder privat?** (besprochen 2026-11-26): bleibt **vorerst öffentlich** (Entscheidung Nutzer). Privat wäre
+  kostenlos möglich (GitHub Free), aber **vorher** braucht der Pi einen Deploy Key (nur Lesen, nur dieses Repository),
+  sonst holt das Auto-Update nichts mehr. Reihenfolge: Skripte umbauen → Schlüssel auf dem Pi erzeugen → bei GitHub
+  eintragen (Settings → Deploy keys, ohne Schreibrecht) → Pi umstellen + prüfen → erst dann auf privat stellen.
+  Generell für weitere Pi-Apps: ein Deploy Key pro Repository (empfohlen) statt eines gemeinsamen Tokens; Ablauf
+  dafür im privaten Server-Projekt bauen. GitHub Pages geht im kostenlosen Konto nur mit öffentlichen Repositorys.
   Die Skripte arbeiten im Ordner, in dem sie liegen (keine festen Pfade oder Adressen).
 
 ## 5. Aufbau
@@ -174,6 +180,9 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - Einzelnen Termin aus einer Serie löschen/verschieben (geht noch nicht)
 - .ics: tägliche Wiederholungen / „alle 2 Wochen“ kann der Kalender noch nicht (werden einmal eingetragen)
 - Klender: Export-Möglichkeit klären (siehe Entscheidungen)
+- Mainz 05: offizieller Spielplan über calovo (mainz05.de/termine → „Pflichtspiele Profis“ → „Weitere Formate“ → „URL“);
+  Nutzer trägt den Link ein, Rückmeldung offen. Alternative: FotMob (Team 9905, „synccalendar“ → ICS)
+- Repository evtl. später privat (siehe Entscheidungen, Deploy Key)
 - Erinnerungen/Benachrichtigungen aufs Handy (bräuchte https bzw. eigene Lösung)
 - Suche
 - Einladungs-Link mit Einmal-Code (noch weniger Tipparbeit als Benutzername + Startpasswort)
@@ -237,3 +246,4 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 | 2026-11-26 | Nach erneutem Lauf: Firewall-Freigabe 443 eingetragen („Rule added“, 443 + 8502 nur Heimnetz). Am Handy lädt `https://kalender.<domain>` ✅, Hinweis „Installieren“ erscheint ✅. Installieren selbst + App ohne Adresszeile: Rückmeldung offen |
 | 2026-11-26 | Andere Kalender: .ics-Import (mit Vorschau) und -Export, Kalender-Links (Abos, z. B. Spielplan) holt der Pi alle 6 Stunden. Neue Tests `test_ics.py` + `ics_oberflaeche_test.js`, alle Tests grün. Direkt auf `main` (Entscheidung Nutzer) |
 | 2026-11-26 | „Für wen?“: Namens-Schilder in Personenfarbe statt kleiner Punkte, Auswahl als antippbare Schilder, niemand = „Alle“ (ganze Familie, auch Standard für neue Termine), mehrfarbiger Streifen. Alle Tests grün, direkt auf `main` |
+| 2026-11-26 | Pi-Befehle ab jetzt immer als `ssh -t pi '…'` (Nutzer tippt in Termux; `-t` für sudo). Update auf dem Pi kam per Auto-Update („Bereits aktuell“). Mainz-05-Link: offizielle Quelle calovo („Weitere Formate“ → „URL“), Eintragen durch Nutzer offen. Besprochen: Repository bleibt vorerst öffentlich; privat ginge kostenlos mit Deploy Key auf dem Pi (Reihenfolge siehe Entscheidungen) |
