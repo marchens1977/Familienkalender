@@ -12,6 +12,9 @@ alle Freigegebenen pflegen einen gemeinsamen Kalender. Bedienung im Handy-Browse
   mit „Du machst:“ / „Ich mache:“. Bei Unklarheit kurz nachfragen statt raten. Vor größeren Änderungen in 2–3 Sätzen sagen, was geplant ist.
 - Geräte: nur **Handy** und **Raspberry Pi**. Kein PC. Arbeit über GitHub.
 - Befehle für den Pi immer komplett zum Kopieren geben und sagen, was sie tun. Claude erreicht den Pi nicht direkt.
+  **Der Nutzer tippt sie in Termux am Handy** → Pi-Befehle immer mit `ssh pi '…'` davor geben, z. B.
+  `ssh pi 'bash ~/familienkalender/pi/aktualisieren.sh'` (Entscheidung Nutzer 2026-11-26). Mehrere Befehle in eine
+  Zeile mit `&&`; einfache Anführungszeichen im Befehl vermeiden.
 - Vor jeder Code-Änderung fragen: direkt auf `main` oder Branch mit Pull Request (Nutzer merged selbst).
 - Nach jeder Änderung sagen, ob der Nutzer noch etwas tun muss (mergen, `aktualisieren.sh` auf dem Pi).
 - Nichts löschen oder überschreiben ohne Rückfrage.
@@ -191,7 +194,7 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - [ ] WLAN aus + VPN aus → App zeigt „Keine Verbindung“ mit Hinweis auf WireGuard
 - [ ] App offen, dann WLAN aus (VPN aus) → nach spätestens 1 Minute oranger Balken „Keine Verbindung … WireGuard einschalten“; WLAN wieder an → Balken verschwindet
 - [ ] Mit VPN unterwegs: `https://kalender.<domain>` öffnet sich
-- [ ] `bash ~/familienkalender/pi/pruefen.sh` zeigt „Verschlüsselt (https) ✅“
+- [ ] `ssh pi 'bash ~/familienkalender/pi/pruefen.sh'` zeigt „Verschlüsselt (https) ✅“
 - [ ] Termin anlegen, ändern, löschen klappt; Datum wird deutsch angezeigt
 - [ ] (.ics) ☰ → „Andere Kalender“ → „Als .ics exportieren“ lädt eine Datei herunter
 - [ ] (.ics) Klender: gibt es dort „Exportieren“/„Teilen“ als .ics? (Ergebnis Claude sagen)
@@ -205,7 +208,7 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - [ ] Einstellungen → Exportieren lädt eine Datei herunter
 - [ ] Unterwegs mit VPN an: Kalender öffnet sich; mit VPN aus: Kalender ist **nicht** erreichbar
 - [ ] Nach einem Neustart des Pi läuft der Kalender wieder von selbst
-- [ ] Nach 1–2 Tagen: `bash ~/familienkalender/pi/pruefen.sh` zeigt Sicherungen
+- [ ] Nach 1–2 Tagen: `ssh pi 'bash ~/familienkalender/pi/pruefen.sh'` zeigt Sicherungen
 
 ## 9. Verlauf
 
