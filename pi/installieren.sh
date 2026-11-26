@@ -9,6 +9,7 @@
 #     unter https://kalender.<domain> und ist als App installierbar. Die alte Adresse leitet dann weiter.
 # Bewusst stehen KEINE Adressen oder Netzdaten im Skript - alles wird auf dem Pi ermittelt.
 set -e
+export PATH="$PATH:/usr/sbin:/sbin"   # Verwaltungsprogramme (ufw, ss, ip) auch bei "ssh pi '...'" finden
 ORDNER="$(cd "$(dirname "$0")/.." && pwd)"
 DATEN="$HOME/familienkalender-daten"
 PORT="${FK_PORT:-8502}"
@@ -109,11 +110,14 @@ DIENST
 sudo systemctl daemon-reload
 sudo systemctl enable --now familienkalender-update.timer
 
-if command -v ufw > /dev/null; then
+# ufw liegt in /usr/sbin - das fehlt im Suchpfad, wenn das Skript per "ssh pi '...'" laeuft
+if command -v ufw > /dev/null || [ -x /usr/sbin/ufw ] || [ -x /sbin/ufw ]; then
   sudo ufw allow from "$HEIMNETZ" to any port "$PORT" proto tcp comment 'Familienkalender'
   if [ "$HTTPS" = 1 ]; then
     sudo ufw allow from "$HEIMNETZ" to any port "$HTTPS_PORT" proto tcp comment 'Familienkalender https'
   fi
+  echo "Firewall-Freigaben fuer den Kalender (nur Heimnetz):"
+  sudo ufw status | grep -E "Familienkalender|^To|^--" || true
 else
   echo "Hinweis: Keine Firewall (ufw) gefunden. Bitte Claude fragen."
 fi
