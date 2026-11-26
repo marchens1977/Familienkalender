@@ -180,12 +180,12 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - Einzelnen Termin aus einer Serie löschen/verschieben (geht noch nicht)
 - .ics: tägliche Wiederholungen / „alle 2 Wochen“ kann der Kalender noch nicht (werden einmal eingetragen)
 - Klender: Export-Möglichkeit klären (siehe Entscheidungen)
-- Mainz 05: offizieller Spielplan über calovo (mainz05.de/termine → „Pflichtspiele Profis“ → „Weitere Formate“ → „URL“);
-  Nutzer trägt den Link ein, Rückmeldung offen. Alternative: FotMob (Team 9905, „synccalendar“ → ICS)
 - Repository evtl. später privat (siehe Entscheidungen, Deploy Key)
 - Erinnerungen/Benachrichtigungen aufs Handy (bräuchte https bzw. eigene Lösung)
 - Suche
 - Einladungs-Link mit Einmal-Code (noch weniger Tipparbeit als Benutzername + Startpasswort)
+- (Erledigt 2026-11-26: Mainz-05-Spielplan als Kalender-Link über calovo, mainz05.de/termine → „Pflichtspiele Profis“ →
+  „Weitere Formate“ → „URL“. Ersatz falls nötig: FotMob, Team 9905, „synccalendar“ → ICS)
 - Familie außerhalb: prüfen, ob `kalender.<domain>` per VPN auflöst (WireGuard-Datei sollte die FritzBox als DNS nutzen)
 - Weitere Pi-Apps (z. B. Kicktipp) können dasselbe Sammel-Zertifikat nutzen; dann braucht es für Port 443 einen
   gemeinsamen Verteiler (Reverse Proxy) – erst angehen, wenn es soweit ist
@@ -213,13 +213,13 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - [ ] Mit VPN unterwegs: `https://kalender.<domain>` öffnet sich
 - [ ] `ssh -t pi 'bash ~/familienkalender/pi/pruefen.sh'` zeigt „Verschlüsselt (https) ✅“
 - [ ] Termin anlegen, ändern, löschen klappt; Datum wird deutsch angezeigt
-- [ ] (Für wen) Neuer Termin: niemand angetippt → Schild „Alle“; zwei Personen angetippt → zwei farbige Namens-Schilder, Streifen zweifarbig
-- [ ] (Für wen) Farben gut lesbar? Schilder groß genug?
+- [x] (2026-11-26) (Für wen) Neuer Termin: niemand angetippt → Schild „Alle“; zwei Personen angetippt → zwei farbige Namens-Schilder, Streifen zweifarbig
+- [x] (2026-11-26) (Für wen) Farben gut lesbar? Schilder groß genug? → „sieht sehr gut aus“
 - [ ] (.ics) ☰ → „Andere Kalender“ → „Als .ics exportieren“ lädt eine Datei herunter
 - [ ] (.ics) Klender: gibt es dort „Exportieren“/„Teilen“ als .ics? (Ergebnis Claude sagen)
 - [ ] (.ics) Google-Kalender-Datei importiert → Rückfrage mit Anzahl → Termine sind da, Uhrzeiten stimmen
 - [ ] (.ics) Dieselbe Datei nochmal → „Keine neuen Termine“
-- [ ] (Link) Mainz-05-Spielplan-Link eingetragen → „Gespeichert ✓ … Termine eingetragen“, Anstoßzeiten stimmen
+- [x] (2026-11-26) (Link) Mainz-05-Spielplan-Link eingetragen → „Gespeichert ✓ … Termine eingetragen“, Anstoßzeiten stimmen
 - [ ] (Link) Nach einem Tag: in der Liste steht ein neues „zuletzt geholt“
 - [ ] Geburtstag mit „jedes Jahr“ erscheint auch im nächsten Jahr
 - [ ] Zweites Profil (z. B. auf einem anderen Handy) anlegen → „wartet auf Freigabe“ → du gibst frei → Anmeldung klappt
@@ -247,3 +247,4 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 | 2026-11-26 | Andere Kalender: .ics-Import (mit Vorschau) und -Export, Kalender-Links (Abos, z. B. Spielplan) holt der Pi alle 6 Stunden. Neue Tests `test_ics.py` + `ics_oberflaeche_test.js`, alle Tests grün. Direkt auf `main` (Entscheidung Nutzer) |
 | 2026-11-26 | „Für wen?“: Namens-Schilder in Personenfarbe statt kleiner Punkte, Auswahl als antippbare Schilder, niemand = „Alle“ (ganze Familie, auch Standard für neue Termine), mehrfarbiger Streifen. Alle Tests grün, direkt auf `main` |
 | 2026-11-26 | Pi-Befehle ab jetzt immer als `ssh -t pi '…'` (Nutzer tippt in Termux; `-t` für sudo). Update auf dem Pi kam per Auto-Update („Bereits aktuell“). Mainz-05-Link: offizielle Quelle calovo („Weitere Formate“ → „URL“), Eintragen durch Nutzer offen. Besprochen: Repository bleibt vorerst öffentlich; privat ginge kostenlos mit Deploy Key auf dem Pi (Reihenfolge siehe Entscheidungen) |
+| 2026-11-26 | Nutzer-Rückmeldung: Namens-Schilder „sehen sehr gut aus“ ✅. Mainz-05-Spielplan (calovo-Link) eingetragen, Spiele kommen automatisch ✅ |
