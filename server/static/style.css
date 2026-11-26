@@ -60,8 +60,19 @@ label.zeile { display: flex; align-items: center; gap: .5em; color: var(--text);
 .liste li.leer { border-left-color: var(--rand); color: var(--grau); cursor: default; }
 .liste .t { font-weight: 600; }
 .liste .u { font-size: .85em; color: var(--grau); }
-.punkte { display: inline-flex; gap: 3px; margin-left: .3em; vertical-align: middle; }
-.punkte i { width: .7em; height: .7em; border-radius: 50%; display: inline-block; }
+/* Für wen ist der Termin: farbige Namens-Schilder */
+.schilder { display: flex; flex-wrap: wrap; gap: 4px; margin: .25em 0 .15em; }
+.schild { display: inline-block; padding: .1em .55em; border-radius: 999px; font-size: .78em; font-weight: 700;
+  line-height: 1.45; white-space: nowrap; }
+.schild.alle { background: #e6ecf5; color: var(--blau); border: 1px solid #b9c7dd; }
+.block .schilder { margin: .1em 0; gap: 3px; }
+.block .schild { font-size: .85em; padding: 0 .45em; }
+/* mehrere Personen: Streifen links in allen Farben */
+.bunt { border-left-color: transparent !important; background-image: var(--streifen); background-repeat: no-repeat;
+  background-origin: border-box; background-clip: border-box; }
+.liste li.bunt { background-size: 5px 100%; }
+.block.bunt { background-size: 4px 100%; }
+.tag .mini.bunt { background-size: 3px 100%; }
 .plus { position: fixed; right: 1.1em; bottom: 1.3em; width: 3.4em; height: 3.4em; border-radius: 50%;
   background: var(--orange); color: #fff; font-size: 1.6em; border: 0; box-shadow: 0 4px 12px rgba(0,0,0,.25); padding: 0; }
 
@@ -76,7 +87,14 @@ dialog h4 { margin: 1.2em 0 .2em; }
 .zwei > label.zeit { flex: .7; }
 fieldset { border: 1px solid var(--rand); border-radius: 8px; margin: .6em 0; }
 legend { font-size: .92em; color: var(--grau); }
-#teilnehmer label, #abo-teilnehmer label { display: inline-flex; align-items: center; gap: .3em; margin: .2em .8em .2em 0; color: var(--text); }
+.auswahl { display: flex; flex-wrap: wrap; gap: .45em; padding: .2em 0 .3em; }
+.auswahl label.wahl { display: inline-flex; align-items: center; margin: 0; padding: .35em .9em; border-radius: 999px;
+  border: 2px solid var(--farbe); color: var(--text); background: #fff; font-weight: 600; cursor: pointer;
+  position: relative; }
+.auswahl label.wahl input { position: absolute; opacity: 0; pointer-events: none; }
+.auswahl label.wahl:has(input:checked) { background: var(--farbe); color: var(--schrift); }
+.auswahl label.wahl:has(input:checked)::before { content: "✓ "; white-space: pre; }
+.auswahl label.wahl:has(input:focus-visible) { outline: 2px solid var(--blau); outline-offset: 2px; }
 .knoepfe { display: flex; gap: .5em; align-items: center; flex-wrap: wrap; margin-top: .6em; }
 .luecke { flex: 1; }
 .abstand { margin-top: 1.5em; }

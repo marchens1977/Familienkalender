@@ -47,8 +47,12 @@ Läuft auf dem Pi (installiert 2026-11-25). Neue Funktionen werden automatisch g
   - **Tag:** Stundenplan 0–24 Uhr, ganztägige Termine oben, Termine als Blöcke (Überschneidungen nebeneinander),
     orange Linie = jetzt, springt zur passenden Uhrzeit. Auf eine Stunde tippen = neuer Termin zu dieser Uhrzeit
   - Pfeile und Wischen blättern je nach Ansicht Monat / Woche / Tag weiter
-- Termine: ganztägig oder mit Uhrzeit, mehrtägig, Ort, Notiz, „Wer ist dabei?“, Wiederholung
+- Termine: ganztägig oder mit Uhrzeit, mehrtägig, Ort, Notiz, „Für wen?“, Wiederholung
   (wöchentlich, monatlich, jährlich, optional „bis“)
+- **„Für wen?“ (seit 2026-11-26):** Personen werden als farbige Schilder angetippt (✓ + gefüllt = ausgewählt).
+  Niemand ausgewählt = **ganze Familie** → hellblaues Schild „Alle“, hellblauer Streifen. Neue Termine starten mit „Alle“.
+  In Listen (Tag, Woche, Demnächst), Tagesansicht-Blöcken und Kalender-Links stehen die Namen als Schilder in der
+  Farbe der Person (Schrift automatisch hell/dunkel). Mehrere Personen: Streifen links in allen Farben untereinander.
 - Alle 60 Sekunden und beim Zurückkehren in die App werden Änderungen der anderen geladen
 - **Hinweis „Keine Verbindung“** (oranger Balken oben), wenn der Kalender nicht erreichbar ist (z. B. unterwegs ohne
   WireGuard); prüft dann alle 10 Sekunden und sofort, wenn das Handy wieder online ist; verschwindet von selbst.
@@ -102,6 +106,8 @@ Läuft auf dem Pi (installiert 2026-11-25). Neue Funktionen werden automatisch g
   Erneuert das Server-Projekt das Zertifikat, startet es den Dienst `familienkalender` selbst neu.
   Ohne Zertifikat: weiterhin http (im eigenen WLAN bzw. VPN verschlüsselt, aber nicht als App installierbar).
 - Alle freigegebenen Mitglieder dürfen alle Termine bearbeiten und löschen (Familie = Vertrauen).
+- Termine ohne ausgewählte Person gelten für die ganze Familie (Entscheidung Nutzer 2026-11-26), Farbe dann nicht mehr
+  die des Erstellers, sondern hellblau (Mets-Blau ist schon eine Personenfarbe).
 - Wiederholende Termine: Änderungen/Löschen gelten immer für die ganze Serie.
 - **.ics-Format** (Entscheidung 2026-11-26): eigener Leser/Schreiber `server/ics.py` (nur Standardbibliothek, kein pip).
   Kalender-Links werden vom Pi aus abgerufen (ausgehend, Firewall unverändert); die Links (z. B. geheime Google-Adresse)
@@ -146,7 +152,8 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - `test/oberflaeche_test.js` (Playwright/Chromium im Handy-Format): kompletter Ablauf mit drei Personen
   (registrieren, Termin anlegen, Geburtstag jährlich, Freigabe, zweite Person bearbeitet, Export,
   Verwalter legt Mitglied an + WhatsApp-Text, Anmeldung mit Startpasswort + eigenes Passwort, Löschen,
-  Wochenansicht (7 Tage, Blättern), Tagesansicht (Block-Position/-Höhe, Tippen auf Stunde, Ansicht gemerkt)).
+  Wochenansicht (7 Tage, Blättern), Tagesansicht (Block-Position/-Höhe, Tippen auf Stunde, Ansicht gemerkt),
+  „Für wen?“: neu = niemand ausgewählt, Schild mit Namen, zwei Personen = zwei Schilder + bunter Streifen).
 - `test/test_https.py`: https mit selbst erzeugtem Test-Zertifikat (erfundene Domain `beispiel.test`, Kette wird geprüft):
   nur mit `FK_ZERTIFIKATE`, Cookie `Secure`, unverschlüsselte Anfrage stört nicht, Weiterleitung der alten Adresse
   (Seiten, API, Status), Rückfall auf http bei kaputtem Zertifikat, Installier-Dateien.
@@ -158,7 +165,8 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
   Import (Vorschau, Rechte, nichts doppelt), Export, Kalender-Link mit Test-Server auf 127.0.0.1 (neu, geändert,
   entfernt, Link nicht erreichbar, falscher Inhalt, webcal://, Löschen), Ergänzung alter Datenbanken.
 - `test/ics_oberflaeche_test.js` (Chromium): .ics-Datei importieren (Rückfrage, Ergebnis, zweites Mal nichts doppelt),
-  Kalender-Link anlegen + „Jetzt abrufen“, Export als .ics, Termine in „Demnächst“, Hinweis im Termin, Link löschen.
+  Kalender-Link anlegen + „Jetzt abrufen“, Export als .ics, Termine in „Demnächst“ (Schild „Alle“ bzw. Name),
+  Hinweis im Termin, Link löschen.
 - Pi-Skripte: nur Tippfehler-Prüfung (`bash -n`), echter Test auf dem Pi durch den Nutzer.
 
 ## 7. Offene Punkte / Ideen
@@ -196,6 +204,8 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - [ ] Mit VPN unterwegs: `https://kalender.<domain>` öffnet sich
 - [ ] `ssh -t pi 'bash ~/familienkalender/pi/pruefen.sh'` zeigt „Verschlüsselt (https) ✅“
 - [ ] Termin anlegen, ändern, löschen klappt; Datum wird deutsch angezeigt
+- [ ] (Für wen) Neuer Termin: niemand angetippt → Schild „Alle“; zwei Personen angetippt → zwei farbige Namens-Schilder, Streifen zweifarbig
+- [ ] (Für wen) Farben gut lesbar? Schilder groß genug?
 - [ ] (.ics) ☰ → „Andere Kalender“ → „Als .ics exportieren“ lädt eine Datei herunter
 - [ ] (.ics) Klender: gibt es dort „Exportieren“/„Teilen“ als .ics? (Ergebnis Claude sagen)
 - [ ] (.ics) Google-Kalender-Datei importiert → Rückfrage mit Anzahl → Termine sind da, Uhrzeiten stimmen
@@ -226,3 +236,4 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 | 2026-11-26 | WhatsApp-Text: WireGuard „richten wir einmal gemeinsam ein“ (statt Datei schicken). Neuer Hinweis „Keine Verbindung – WireGuard einschalten“ in der offenen App. Tests grün |
 | 2026-11-26 | Nach erneutem Lauf: Firewall-Freigabe 443 eingetragen („Rule added“, 443 + 8502 nur Heimnetz). Am Handy lädt `https://kalender.<domain>` ✅, Hinweis „Installieren“ erscheint ✅. Installieren selbst + App ohne Adresszeile: Rückmeldung offen |
 | 2026-11-26 | Andere Kalender: .ics-Import (mit Vorschau) und -Export, Kalender-Links (Abos, z. B. Spielplan) holt der Pi alle 6 Stunden. Neue Tests `test_ics.py` + `ics_oberflaeche_test.js`, alle Tests grün. Direkt auf `main` (Entscheidung Nutzer) |
+| 2026-11-26 | „Für wen?“: Namens-Schilder in Personenfarbe statt kleiner Punkte, Auswahl als antippbare Schilder, niemand = „Alle“ (ganze Familie, auch Standard für neue Termine), mehrfarbiger Streifen. Alle Tests grün, direkt auf `main` |

@@ -91,7 +91,7 @@ async function warteAufServer() {
     // 2. Kalender-Link anlegen -> Termine sofort da, Liste zeigt Status
     await a.fill("#form-abo [name=name]", "Testverein");
     await a.fill("#form-abo [name=url]", link);
-    await a.check("#abo-teilnehmer input");
+    await a.click("#abo-teilnehmer label.wahl:has-text('Alex')");
     await a.click("#form-abo button[type=submit]");
     await a.waitForFunction(() => /Gespeichert/.test(document.querySelector("#abo-meldung").textContent));
     assert.match(await a.textContent("#abo-meldung"), /2 Termine eingetragen/);
@@ -113,6 +113,11 @@ async function warteAufServer() {
 
     // 4. Termine erscheinen in "Demnächst", Termin aus Link zeigt Hinweis
     await a.waitForSelector("#demnaechst li:has-text('Kinderarzt')");
+    // importiert ohne Personen = ganze Familie -> Schild "Alle"; Link-Termine für Alex -> Schild "Alex"
+    assert.strictEqual(await a.textContent("#demnaechst li:has-text('Kinderarzt') .schild"), "Alle");
+    assert.strictEqual(await a.textContent("#demnaechst li:has-text('Gastmannschaft') .schild"), "Alex");
+    await a.locator("#demnaechst").scrollIntoViewIfNeeded();
+    if (fotos) await a.screenshot({ path: path.join(fotos, "ics-3-demnaechst.png") });
     await a.click("#demnaechst li:has-text('Gastmannschaft')");
     await a.waitForSelector("#dlg-termin[open]");
     assert.match(await a.textContent("#termin-info"), /Kalender-Link „Testverein“/);

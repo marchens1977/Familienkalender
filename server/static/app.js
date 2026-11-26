@@ -96,9 +96,58 @@ function sortierung(a, b) {
 }
 
 function person(id) { return zustand.mitglieder.find((p) => p.id === id); }
-function farbe(e) {
-  const p = person(e.participants[0]) || person(e.created_by);
-  return p ? p.color : "#002D72";
+// Für wen ist der Termin? Niemand angekreuzt = ganze Familie ("Alle")
+const FAMILIE_STREIFEN = "#9fb3d1"; // hellblau, damit "Alle" nicht wie eine Person aussieht
+function fuerWen(e) { return e.participants.map(person).filter(Boolean); }
+function farbe(e) { const p = fuerWen(e)[0]; return p ? p.color : FAMILIE_STREIFEN; }
+function schriftFarbe(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  return 0.299 * r + 0.587 * g + 0.114 * b > 0.62 ? "#1b1f2a" : "#fff";
+}
+// Farbiger Streifen links: eine Farbe pro Person (bei mehreren untereinander)
+function streifen(el, e) {
+  const leute = fuerWen(e);
+  el.style.borderLeftColor = farbe(e);
+  if (leute.length < 2) return;
+  const n = leute.length;
+  const stops = leute.map((p, i) => p.color + " " + (100 * i / n) + "% " + (100 * (i + 1) / n) + "%");
+  el.classList.add("bunt");
+  el.style.setProperty("--streifen", "linear-gradient(to bottom, " + stops.join(", ") + ")");
+}
+// Namens-Schilder in der Farbe der Personen
+function schilder(e) {
+  const box = document.createElement("span");
+  box.className = "schilder";
+  const leute = fuerWen(e);
+  if (!leute.length) {
+    const s = document.createElement("span");
+    s.className = "schild alle";
+    s.textContent = "Alle";
+    box.append(s);
+  }
+  for (const p of leute) {
+    const s = document.createElement("span");
+    s.className = "schild";
+    s.style.background = p.color;
+    s.style.color = schriftFarbe(p.color);
+    s.textContent = p.display_name;
+    box.append(s);
+  }
+  return box;
+}
+// Ankreuz-Liste "Für wen?" als farbige Schilder zum Antippen
+function personenAuswahl(box, ausgewaehlt) {
+  box.replaceChildren();
+  for (const p of zustand.mitglieder) {
+    const l = document.createElement("label");
+    l.className = "wahl";
+    l.style.setProperty("--farbe", p.color);
+    l.style.setProperty("--schrift", schriftFarbe(p.color));
+    const c = document.createElement("input");
+    c.type = "checkbox"; c.value = p.id; c.checked = ausgewaehlt.includes(p.id);
+    l.append(c, document.createTextNode(p.display_name));
+    box.append(l);
+  }
 }
 function zeitText(v) {
   const e = v.e;
@@ -215,12 +264,12 @@ function zeichneTag() {
     b.style.height = Math.max((x.ende - x.start) / 60 * STUNDE_PX - 2, 24) + "px";
     b.style.left = "calc(3.6em + (100% - 3.8em) * " + x.spur + " / " + x.n + ")";
     b.style.width = "calc((100% - 3.8em) / " + x.n + " - 3px)";
-    b.style.borderLeftColor = farbe(x.v.e);
+    streifen(b, x.v.e);
     const t = document.createElement("b");
     t.textContent = x.v.e.title;
     const u = document.createElement("small");
     u.textContent = zeitText(x.v) + (x.v.e.location ? " · " + x.v.e.location : "");
-    b.append(t, u);
+    b.append(t, schilder(x.v.e), u);
     b.addEventListener("click", (ev) => { ev.stopPropagation(); oeffneTermin(x.v.e); });
     plan.append(b);
   }
@@ -269,7 +318,7 @@ function zeichneMonat() {
     eintraege.slice(0, 3).forEach((v) => {
       const m = document.createElement("span");
       m.className = "mini";
-      m.style.borderLeftColor = farbe(v.e);
+      streifen(m, v.e);
       m.textContent = v.e.title;
       zelle.append(m);
     });
@@ -309,27 +358,14 @@ function fuelleListe(ul, eintraege, mitDatum, leerText) {
   }
   for (const v of eintraege) {
     const li = document.createElement("li");
-    li.style.borderLeftColor = farbe(v.e);
+    streifen(li, v.e);
     const t = document.createElement("div");
     t.className = "t";
     t.textContent = v.e.title + (v.e.repeat !== "none" ? " ↻" : "");
-    const punkte = document.createElement("span");
-    punkte.className = "punkte";
-    for (const id of v.e.participants) {
-      const p = person(id);
-      if (!p) continue;
-      const i = document.createElement("i");
-      i.style.background = p.color;
-      i.title = p.display_name;
-      punkte.append(i);
-    }
-    t.append(punkte);
     const u = document.createElement("div");
     u.className = "u";
-    const namen = v.e.participants.map((id) => (person(id) || {}).display_name).filter(Boolean);
-    u.textContent = (mitDatum ? schoen(v.s) + " · " : "") + zeitText(v) +
-      (v.e.location ? " · " + v.e.location : "") + (namen.length ? " · " + namen.join(", ") : "");
-    li.append(t, u);
+    u.textContent = (mitDatum ? schoen(v.s) + " · " : "") + zeitText(v) + (v.e.location ? " · " + v.e.location : "");
+    li.append(t, schilder(v.e), u);
     li.addEventListener("click", () => oeffneTermin(v.e));
     ul.append(li);
   }
@@ -479,7 +515,7 @@ function oeffneTermin(e, uhrzeit) {
   $("#termin-loeschen").classList.toggle("versteckt", !e);
   const t = e || { title: "", start_date: zustand.gewaehlt, end_date: zustand.gewaehlt, all_day: true,
     start_time: "", end_time: "", repeat: "none", repeat_until: "", location: "", notes: "",
-    participants: [zustand.ich.id] };
+    participants: [] }; // neu = ganze Familie
   if (!e && uhrzeit) {
     t.all_day = false;
     t.start_time = uhrzeit;
@@ -496,17 +532,7 @@ function oeffneTermin(e, uhrzeit) {
   formT.repeat_until.value = t.repeat_until || "";
   formT.location.value = t.location;
   formT.notes.value = t.notes;
-  const box = $("#teilnehmer");
-  box.replaceChildren();
-  for (const p of zustand.mitglieder) {
-    const l = document.createElement("label");
-    const c = document.createElement("input");
-    c.type = "checkbox"; c.value = p.id; c.checked = t.participants.includes(p.id);
-    const punkt = document.createElement("i");
-    punkt.style.cssText = "width:.8em;height:.8em;border-radius:50%;display:inline-block;background:" + p.color;
-    l.append(c, punkt, document.createTextNode(p.display_name));
-    box.append(l);
-  }
+  personenAuswahl($("#teilnehmer"), t.participants);
   let info = "";
   if (e) {
     const wer = person(e.updated_by);
@@ -749,19 +775,7 @@ $("#import-ics-datei").addEventListener("change", async (ev) => {
   } catch (e) { meldung.textContent = e.message; }
 });
 
-function abosTeilnehmer() {
-  const box = $("#abo-teilnehmer");
-  box.replaceChildren();
-  for (const p of zustand.mitglieder) {
-    const l = document.createElement("label");
-    const c = document.createElement("input");
-    c.type = "checkbox"; c.value = p.id;
-    const punkt = document.createElement("i");
-    punkt.style.cssText = "width:.8em;height:.8em;border-radius:50%;display:inline-block;background:" + p.color;
-    l.append(c, punkt, document.createTextNode(p.display_name));
-    box.append(l);
-  }
-}
+function abosTeilnehmer() { personenAuswahl($("#abo-teilnehmer"), []); }
 
 async function zeigeAbos() {
   abosTeilnehmer();
@@ -771,8 +785,7 @@ async function zeigeAbos() {
   for (const a of liste) {
     const li = document.createElement("li");
     li.className = "benutzer abo";
-    const p = person(a.participants[0]);
-    if (p) li.style.borderLeftColor = p.color;
+    streifen(li, a);
     const t = document.createElement("div"); t.className = "t"; t.textContent = a.name;
     const u = document.createElement("div"); u.className = "u";
     u.textContent = a.anzahl + " Termine" + (a.last_ok ? " · zuletzt geholt " +
@@ -793,7 +806,7 @@ async function zeigeAbos() {
       try { await api("DELETE", "/api/abos/" + a.id); await zeigeAbos(); await ladeDaten(); } catch (e) { alert(e.message); }
     });
     ak.append(abrufen, weg);
-    li.append(t, u, st, ak);
+    li.append(t, schilder(a), u, st, ak);
     ul.append(li);
   }
 }

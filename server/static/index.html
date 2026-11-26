@@ -103,7 +103,7 @@
     </label>
     <label id="bis-zeile" class="versteckt">Wiederholen bis (leer = immer) <input type="date" name="repeat_until"></label>
     <label>Ort <input name="location" maxlength="120"></label>
-    <fieldset><legend>Wer ist dabei?</legend><div id="teilnehmer"></div></fieldset>
+    <fieldset><legend>Für wen? <span class="klein">Niemand angetippt = ganze Familie</span></legend><div id="teilnehmer" class="auswahl"></div></fieldset>
     <label>Notiz <textarea name="notes" maxlength="2000" rows="3"></textarea></label>
     <p id="termin-info" class="klein"></p>
     <p id="termin-fehler" class="fehler"></p>
@@ -186,7 +186,7 @@
       <form id="form-abo">
         <label>Name (z. B. Mainz 05) <input name="name" maxlength="60" required></label>
         <label>Link (beginnt mit https:// oder webcal://) <input name="url" inputmode="url" autocomplete="off" required></label>
-        <fieldset><legend>Wer ist dabei? (bestimmt die Farbe)</legend><div id="abo-teilnehmer"></div></fieldset>
+        <fieldset><legend>Für wen? <span class="klein">Niemand angetippt = ganze Familie</span></legend><div id="abo-teilnehmer" class="auswahl"></div></fieldset>
         <button type="submit" class="haupt">Hinzufügen und abrufen</button>
         <p id="abo-meldung" class="klein"></p>
       </form>

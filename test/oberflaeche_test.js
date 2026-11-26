@@ -57,10 +57,15 @@ async function warteAufServer() {
     await a.fill("#form-termin [name=start_time]", "19:00");
     await a.fill("#form-termin [name=end_time]", "20:30");
     await a.fill("#form-termin [name=location]", "Schule");
+    // "Für wen?": neu ist niemand ausgewählt (= ganze Familie); Alex als Schild antippen
+    assert.strictEqual(await a.locator("#teilnehmer input:checked").count(), 0);
+    await a.click("#teilnehmer label.wahl:has-text('Alex')");
+    assert.strictEqual(await a.locator("#teilnehmer input:checked").count(), 1);
     if (fotos) await a.screenshot({ path: path.join(fotos, "2-termin.png") });
     await a.click("#form-termin button[type=submit]");
     await a.waitForSelector("#tag-liste li:has-text('Elternabend')");
-    assert.match(await a.textContent("#tag-liste"), /19:00–20:30 Uhr · Schule · Alex/);
+    assert.match(await a.textContent("#tag-liste"), /19:00–20:30 Uhr · Schule/);
+    assert.strictEqual(await a.textContent("#tag-liste li .schild"), "Alex");
     assert.strictEqual(await a.locator("#raster .tag.heute .mini").count(), 1);
 
     // 2b. Wochenansicht: 7 Tage untereinander, Termin am heutigen Tag
@@ -156,8 +161,12 @@ async function warteAufServer() {
     // 7. Sam ändert den Termin, Alex sieht das nach dem Neuladen
     await b.click("#tag-liste li:has-text('Elternabend')");
     await b.fill("#form-termin [name=title]", "Elternabend Klasse 3");
+    await b.click("#teilnehmer label.wahl:has-text('Sam')"); // jetzt für zwei Personen
     await b.click("#form-termin button[type=submit]");
     await b.waitForSelector("#tag-liste li:has-text('Klasse 3')");
+    assert.deepStrictEqual(await b.locator("#tag-liste li .schild").allTextContents(), ["Alex", "Sam"]);
+    assert.strictEqual(await b.locator("#tag-liste li.bunt").count(), 1); // Streifen in beiden Farben
+    if (fotos) await b.screenshot({ path: path.join(fotos, "12-schilder.png") });
     await a.reload();
     await a.waitForSelector("#tag-liste li:has-text('Klasse 3')");
     if (fotos) await a.screenshot({ path: path.join(fotos, "4-kalender.png") });
