@@ -34,7 +34,7 @@ async function warteAufServer() {
     const a = await ctxA.newPage();
     a.on("pageerror", (e) => fehler.push(e.message));
     // erwartete Antworten wie 401 (noch nicht angemeldet) sind keine Fehler
-    a.on("console", (m) => { if (m.type() === "error" && !/status of 40[13]/.test(m.text())) fehler.push(m.text()); });
+    a.on("console", (m) => { if (m.type() === "error" && !/status of 40[13]|ERR_INTERNET_DISCONNECTED/.test(m.text())) fehler.push(m.text()); });
     a.on("dialog", (d) => d.accept());
     await a.goto(URL);
 
@@ -207,6 +207,21 @@ async function warteAufServer() {
     await k.waitForSelector("#ansicht-kalender:not(.versteckt)");
     await k.waitForTimeout(300);
     assert.strictEqual(await k.locator("#dlg-erstpasswort[open]").count(), 0);
+
+    // 8d. Verbindung weg (z. B. unterwegs ohne WireGuard) -> oranger Hinweis, kommt sie wieder -> Hinweis weg
+    assert.match(zugang, /gemeinsam ein/);
+    assert.doesNotMatch(zugang, /Datei/);
+    await ctxA.setOffline(true);
+    await a.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await a.waitForSelector("#verbindung:not(.versteckt)");
+    assert.match(await a.textContent("#verbindung"), /WireGuard/);
+    if (fotos) await a.screenshot({ path: path.join(fotos, "11-keine-verbindung.png") });
+    await ctxA.setOffline(false); // Handy meldet "wieder online" -> App sieht sofort nach, Hinweis verschwindet
+    await a.waitForSelector("#verbindung.versteckt", { state: "attached" });
+    // Knopf "Nochmal" prüft ebenfalls (Hinweis bleibt weg, weil Verbindung da ist)
+    await a.evaluate(() => document.getElementById("verbindung-nochmal").click());
+    await a.waitForTimeout(300);
+    assert.strictEqual(await a.locator("#verbindung.versteckt").count(), 1);
 
     // 9. Löschen
     await a.click("#tag-liste li:has-text('Klasse 3')");

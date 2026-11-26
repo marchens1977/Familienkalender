@@ -153,3 +153,9 @@ dialog { border-top: 6px solid var(--orange); }
 .installieren span { flex: 1; }
 .installieren button { padding: .4em .8em; }
 .installieren .haupt { background: var(--orange); border-color: var(--orange); }
+
+/* Hinweis "Keine Verbindung" (oben, solange der Kalender nicht erreichbar ist) */
+.verbindung { display: flex; align-items: center; gap: .6em; background: var(--orange); color: #fff;
+  padding: .55em .8em; font-size: .92em; position: sticky; top: 0; z-index: 3; }
+.verbindung span { flex: 1; }
+.verbindung button { background: #fff; color: var(--orange); border-color: #fff; padding: .35em .8em; font-weight: 600; }

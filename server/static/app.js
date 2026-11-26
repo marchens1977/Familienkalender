@@ -27,7 +27,7 @@ async function api(methode, pfad, daten) {
   try {
     r = await fetch(pfad, opt);
   } catch (e) {
-    throw Object.assign(new Error("Keine Verbindung zum Pi. Bist du im Heimnetz oder im VPN?"), { status: 0 });
+    throw Object.assign(new Error("Keine Verbindung zum Kalender. Nicht zu Hause? Dann bitte zuerst WireGuard (VPN) einschalten."), { status: 0 });
   }
   let inhalt = {};
   try { inhalt = await r.json(); } catch (e) { /* leer */ }
@@ -653,7 +653,7 @@ function zugangsText(name, benutzername, passwort) {
   return "Hallo " + name + "! 👋\n" +
     "Du hast jetzt Zugang zu unserem Familienkalender 📅\n\n" +
     "1. Nur wenn du NICHT bei uns im WLAN bist: zuerst die App „WireGuard“ einschalten " +
-    "(einmalig einrichten mit der Datei, die ich dir schicke).\n" +
+    "(richten wir einmal gemeinsam ein).\n" +
     "2. Diesen Link öffnen: " + location.origin + "\n" +
     "3. Anmelden mit\n   Benutzername: " + benutzername + "\n   Startpasswort: " + passwort + "\n" +
     "4. Danach ein eigenes Passwort wählen.\n" +
@@ -735,13 +735,28 @@ async function versionPruefen() {
 versionPruefen();
 
 // Alle 60 Sekunden neu laden, damit Änderungen der anderen ankommen
+// Hinweis, wenn der Kalender nicht erreichbar ist (z. B. unterwegs ohne WireGuard)
+let ohneVerbindung = false;
+function verbindungsHinweis(weg) {
+  ohneVerbindung = weg;
+  $("#verbindung").classList.toggle("versteckt", !weg);
+}
 async function auffrischen() {
   if (document.visibilityState !== "visible") return;
   if (await versionPruefen()) return;
-  if (zustand.ich && !$("#dlg-termin").open) ladeDaten().catch(() => {});
+  if (!zustand.ich || $("#dlg-termin").open) return;
+  try {
+    await ladeDaten();
+    verbindungsHinweis(false);
+  } catch (e) {
+    if (e.status === 0) verbindungsHinweis(true);
+  }
 }
 setInterval(auffrischen, 60000);
+setInterval(() => { if (ohneVerbindung) auffrischen(); }, 10000); // ohne Verbindung öfter nachsehen
 document.addEventListener("visibilitychange", auffrischen);
+window.addEventListener("online", auffrischen);
+$("#verbindung-nochmal").addEventListener("click", auffrischen);
 
 start();
 

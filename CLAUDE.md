@@ -47,6 +47,10 @@ Läuft auf dem Pi (installiert 2026-11-25). Neue Funktionen werden automatisch g
 - Termine: ganztägig oder mit Uhrzeit, mehrtägig, Ort, Notiz, „Wer ist dabei?“, Wiederholung
   (wöchentlich, monatlich, jährlich, optional „bis“)
 - Alle 60 Sekunden und beim Zurückkehren in die App werden Änderungen der anderen geladen
+- **Hinweis „Keine Verbindung“** (oranger Balken oben), wenn der Kalender nicht erreichbar ist (z. B. unterwegs ohne
+  WireGuard); prüft dann alle 10 Sekunden und sofort, wenn das Handy wieder online ist; verschwindet von selbst.
+  Beim Öffnen ohne Verbindung zeigt die installierte App die Seite „Keine Verbindung“ (siehe https).
+  Eine Web-App kann WireGuard **nicht** selbst einschalten (Handy-Sicherheit) → Lösung am Handy, siehe Server-Projekt
 - **Automatische Updates:** Pi prüft stündlich GitHub (`main`). Startet die neue Version nicht, holt er die alte zurück.
   Offene Kalender am Handy merken eine neue Version (`/api/status` → `version`) und laden sich selbst neu.
 - Export (alle Mitglieder) als JSON-Datei, Import (nur Verwalter, überspringt Doppelte, überschreibt nichts)
@@ -72,6 +76,8 @@ Läuft auf dem Pi (installiert 2026-11-25). Neue Funktionen werden automatisch g
 - **Wichtig wegen Auto-Update:** Was auf `main` landet, ist spätestens nach einer Stunde live bei der ganzen Familie.
   Deshalb vor jedem Speichern auf `main` immer `bash test/alle_tests.sh` – nur bei „alles OK“ speichern.
 - Startpasswort per WhatsApp ist vertretbar, weil es beim ersten Anmelden ersetzt werden muss.
+- **WireGuard-Zugang (QR-Code/Datei) wird nie per WhatsApp/E-Mail verschickt** (= Hausschlüssel), sondern persönlich
+  eingerichtet (Entscheidung Nutzer 2026-11-26). Der Zugangstext sagt deshalb „richten wir einmal gemeinsam ein“.
 - Passwörter nur als scrypt-Hash gespeichert. Sitzung per Cookie (HttpOnly, SameSite=Strict, 90 Tage).
   Schreibzugriffe brauchen die Kopfzeile `X-Familienkalender: 1` (Schutz gegen fremde Webseiten).
   Max. 10 Fehlversuche pro 15 Minuten beim Anmelden.
@@ -158,6 +164,7 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 - [ ] Oranger Hinweis „Installieren“ (oder ⋮ → „App installieren“) → Symbol auf dem Startbildschirm, App öffnet **ohne Adresszeile**
 - [ ] Nach Installation einmal neu anmelden nötig? (wegen neuer Adresse vermutlich ja – einmalig)
 - [ ] WLAN aus + VPN aus → App zeigt „Keine Verbindung“ mit Hinweis auf WireGuard
+- [ ] App offen, dann WLAN aus (VPN aus) → nach spätestens 1 Minute oranger Balken „Keine Verbindung … WireGuard einschalten“; WLAN wieder an → Balken verschwindet
 - [ ] Mit VPN unterwegs: `https://kalender.<domain>` öffnet sich
 - [ ] `bash ~/familienkalender/pi/pruefen.sh` zeigt „Verschlüsselt (https) ✅“
 - [ ] Termin anlegen, ändern, löschen klappt; Datum wird deutsch angezeigt
@@ -182,4 +189,5 @@ Alles auf einmal: `bash test/alle_tests.sh` (optional mit Ordner für Bildschirm
 | 2026-11-25 | Entscheidung: installierbare Web-App über eigene Domain + https (statt APK). Einrichtung der Domain zuerst im privaten Server-Projekt, danach Umbau hier |
 | 2026-11-26 | Server-Projekt meldet: Sammel-Zertifikat auf dem Pi fertig. Hier umgebaut: https mit Zertifikat vom Pi (Port 443, Link ohne Zusatz), Weiterleitung der alten Adresse, Rückfall auf http, Installier-Funktion (Manifest, PNG-Symbole, Service Worker, Seite „Keine Verbindung“, Hinweis „Installieren“), Installations-/Prüfskript erweitert. Beim Testen gefunden: Test-Browser der Cloud kann erfundene Namen nicht umleiten (Umgebung, nicht Kalender). 25 Server-/Skript-Tests + 2 Browser-Tests grün. Am selben Abend eingeschaltet (siehe nächste Zeilen) |
 | 2026-11-26 | Auf dem Pi eingeschaltet (Foto): Zertifikat gefunden ✅, verschlüsselte Verbindung geprüft ✅. **Fehler:** Skript fand per `ssh pi '…'` die Firewall nicht (`/usr/sbin` fehlt im Suchpfad) → https-Freigabe fehlte. Behoben (Suchpfad ergänzt, Freigaben werden am Ende angezeigt). **Regel:** Pi-Skripte müssen auch über `ssh pi '…'` laufen |
+| 2026-11-26 | WhatsApp-Text: WireGuard „richten wir einmal gemeinsam ein“ (statt Datei schicken). Neuer Hinweis „Keine Verbindung – WireGuard einschalten“ in der offenen App. Tests grün |
 | 2026-11-26 | Nach erneutem Lauf: Firewall-Freigabe 443 eingetragen („Rule added“, 443 + 8502 nur Heimnetz). Am Handy lädt `https://kalender.<domain>` ✅, Hinweis „Installieren“ erscheint ✅. Installieren selbst + App ohne Adresszeile: Rückmeldung offen |
